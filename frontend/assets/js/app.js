@@ -3,7 +3,7 @@ const configured = cfg.SUPABASE_URL && !cfg.SUPABASE_URL.includes('YOUR_PROJECT'
 let supabase = null;
 let supabaseClientPromise = null;
 async function getSupabase(){if(!configured)throw new Error('Configure Supabase first.');if(!supabaseClientPromise)supabaseClientPromise=import('https://esm.sh/@supabase/supabase-js@2.49.1').then(({createClient})=>{supabase=createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY);return supabase;}).catch(error=>{supabaseClientPromise=null;throw new Error(`Could not load the authentication client: ${error.message}`);});return supabaseClientPromise;}
-const API = cfg.API_BASE_URL || 'http://127.0.0.1:8000';
+const API = cfg.API_BASE_URL || 'https://broker-backend-delta.vercel.app';
 const page = document.body.dataset.page || 'home';
 const app = document.querySelector('#app');
 const $ = (sel, root=document) => root.querySelector(sel);
@@ -97,7 +97,87 @@ let turnstileLoader;
 async function loadTurnstile(){if(window.turnstile)return window.turnstile;if(!turnstileLoader){turnstileLoader=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';script.async=true;script.defer=true;script.onload=()=>window.turnstile?resolve(window.turnstile):reject(new Error('Human verification did not load.'));script.onerror=()=>reject(new Error('Could not load human verification. Check your connection and try again.'));document.head.append(script);}).catch(error=>{turnstileLoader=null;throw error;});}return turnstileLoader;}
 function showRegistrationResult(success,message){const dialog=$('#auth-result-dialog');if(!dialog){$('#form-message').innerHTML=notice(message,success?'success':'error');return;}dialog.dataset.state=success?'success':'error';$('[data-auth-dialog-icon]',dialog).textContent=success?'✓':'!';$('#auth-dialog-title',dialog).textContent=success?'Account created':'Account creation failed';$('[data-auth-dialog-message]',dialog).textContent=message;if(typeof dialog.showModal==='function')dialog.showModal();else $('#form-message').innerHTML=notice(message,success?'success':'error');}
 async function handleAuth(){const form=$('#auth-form');if(!form)return;const kind=form.dataset.authKind;const out=$('#form-message');const submitButton=$('button[type="submit"]',form);let captchaToken='';let widgetId;const dialog=$('#auth-result-dialog');if(dialog){$('[data-auth-dialog-close]',dialog).addEventListener('click',()=>dialog.close());dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close();});}if(kind==='register'){const help=$('#captcha-help');if(!cfg.CAPTCHA_SITE_KEY||cfg.CAPTCHA_SITE_KEY.includes('YOUR_CLOUDFLARE')){help.textContent='Registration is unavailable until Turnstile is configured.';}else{try{const turnstile=await loadTurnstile();widgetId=turnstile.render('#turnstile-container',{sitekey:cfg.CAPTCHA_SITE_KEY,callback:token=>{captchaToken=token;submitButton.disabled=false;help.textContent='Human verification complete.';},'expired-callback':()=>{captchaToken='';submitButton.disabled=true;help.textContent='Verification expired. Complete the check again.';},'error-callback':()=>{captchaToken='';submitButton.disabled=true;help.textContent='Verification failed to load. Refresh the page and try again.';}});}catch(error){help.textContent=error.message;}}}form.addEventListener('submit',async e=>{e.preventDefault();const data=new FormData(form);try{const client=await getSupabase();let res;if(kind==='login'){res=await client.auth.signInWithPassword({email:data.get('email'),password:data.get('password')});if(res.error)throw res.error;location.href='../member/dashboard.html';return;}if(kind==='register'){if(data.get('password')!==data.get('password_confirm'))throw new Error('Passwords do not match.');if(!captchaToken)throw new Error('Complete the human verification before creating your account.');submitButton.disabled=true;res=await client.auth.signUp({email:data.get('email'),password:data.get('password'),options:{data:{full_name:data.get('full_name')},emailRedirectTo:location.origin+'/pages/login.html',captchaToken}});if(res.error)throw res.error;showRegistrationResult(true,'Your account has been created. If email confirmation is enabled, check your inbox to verify your address before signing in.');return;}res=await client.auth.resetPasswordForEmail(data.get('email'),{redirectTo:location.origin+'/pages/login.html'});if(res.error)throw res.error;out.innerHTML=notice('If the account exists, a password reset email has been requested.','success');}catch(err){if(kind==='register')showRegistrationResult(false,err.message||'We could not create your account. Please try again.');else out.innerHTML=notice(err.message||'Authentication failed.','error');if(kind==='register'&&widgetId!==undefined){captchaToken='';submitButton.disabled=true;window.turnstile?.reset(widgetId);$('#captcha-help').textContent='Please complete the human verification again.';}}finally{if(kind==='register'&&!dialog?.open&&widgetId!==undefined)submitButton.disabled=!captchaToken;}});}
-async function protect(){if(!['dashboard','new-deposit','deposit-history','investments','withdrawals','transactions','partner-program','profile'].includes(page)&&!page.startsWith('admin-'))return true;if(!supabase){app.innerHTML=`<section class="section"><div class="container">${notice('Configure Supabase in assets/js/config.js to use the member portal.','error')}<a class="btn btn-primary" href="../pages/login.html">Go to login</a></div></section>`;return false;}const s=await session();if(!s){location.href=page.startsWith('admin-')?'../pages/login.html':'../pages/login.html';return false;}try{await api('/api/me');if(page.startsWith('admin-')){const r=await api('/api/admin/overview');return true;}return true;}catch(err){if(String(err.message).includes('Administrator')){app.innerHTML=`<section class="section"><div class="container">${notice('Administrator access is required for this page.','error')}<a class="btn btn-outline" href="../member/dashboard.html">Member dashboard</a></div></section>`;return false;}app.innerHTML=`<section class="section"><div class="container">${notice(err.message,'error')}</div></section>`;return false;}}
+
+async function protect() {
+  const protectedPages = [
+    'dashboard',
+    'new-deposit',
+    'deposit-history',
+    'investments',
+    'withdrawals',
+    'transactions',
+    'partner-program',
+    'profile'
+  ];
+
+  const isAdmin = page.startsWith('admin-');
+
+  if (!protectedPages.includes(page) && !isAdmin) {
+    return true;
+  }
+
+  if (!configured) {
+    app.innerHTML = `
+      <section class="section">
+        <div class="container">
+          ${notice(
+            'Configure Supabase in assets/js/config.js to use the member portal.',
+            'error'
+          )}
+          <a class="btn btn-primary" href="../pages/login.html">
+            Go to login
+          </a>
+        </div>
+      </section>
+    `;
+    return false;
+  }
+
+  try {
+    const s = await session();
+
+    if (!s) {
+      location.href = '../pages/login.html';
+      return false;
+    }
+
+    await api('/api/me');
+
+    if (isAdmin) {
+      await api('/api/admin/overview');
+    }
+
+    return true;
+  } catch (err) {
+    if (String(err.message).includes('Administrator')) {
+      app.innerHTML = `
+        <section class="section">
+          <div class="container">
+            ${notice(
+              'Administrator access is required for this page.',
+              'error'
+            )}
+            <a class="btn btn-outline" href="../member/dashboard.html">
+              Member dashboard
+            </a>
+          </div>
+        </section>
+      `;
+      return false;
+    }
+
+    app.innerHTML = `
+      <section class="section">
+        <div class="container">
+          ${notice(err.message || 'Unable to load your account.', 'error')}
+        </div>
+      </section>
+    `;
+
+    return false;
+  }
+}
+
 function sidebar(admin=false){const items=admin?[['Overview','index.html'],['Users','users.html'],['Deposits','deposits.html'],['Withdrawals','withdrawals.html'],['Plans','investments.html'],['Transactions','transactions.html'],['Partner program','partner-program.html'],['Audit log','audit-log.html'],['Settings','settings.html']]:[['Dashboard','dashboard.html'],['New deposit request','new-deposit.html'],['Deposit history','deposit-history.html'],['Investments','investments.html'],['Withdrawals','withdrawals.html'],['Transactions','transactions.html'],['Partner program','partner-program.html'],['My profile','profile.html']];return `<aside class="sidebar">${items.map(([n,p])=>`<a class="${location.pathname.endsWith(p)?'active':''}" href="${p}">${n}</a>`).join('')}</aside>`;}
 async function memberPage(){const admin=page.startsWith('admin-');const title=admin?({ 'admin-overview':'Admin overview','admin-users':'Users','admin-deposits':'Deposit reviews','admin-withdrawals':'Withdrawal reviews','admin-plans':'Plans & products','admin-transactions':'Transactions','admin-partners':'Partner program','admin-audit':'Audit log','admin-settings':'Settings'}[page]||'Administration'):({dashboard:'Dashboard','new-deposit':'New deposit request','deposit-history':'Deposit history',investments:'Investments',withdrawals:'Withdrawals',transactions:'Transactions','partner-program':'Partner program',profile:'My profile'}[page]||'Member area');app.innerHTML=`<section class="section"><div class="container"><p class="eyebrow">${admin?'ADMINISTRATION':'MEMBER AREA'}</p><h1>${title}</h1><div class="dashboard-layout">${sidebar(admin)}<div class="dashboard-main"><div class="loading">Loading your records…</div></div></div></div></section>`;const main=$('.dashboard-main');try{if(page==='dashboard'){const d=await api('/api/dashboard');const balance=Number(d.wallet?.balance ?? 0);const profit=Number((balance*0.127).toFixed(2));const tickers=[['BTC','$62,448','+2.42%'],['ETH','$3,310','+1.68%'],['SOL','$148.61','+3.11%'],['USDT','$1.00','+0.02%']];const bars=[18,32,24,42,58,51,70,78,68,84,82,96];const pendingDeck=(d.deposits||[]).filter(x=>x.status==='pending').length+(d.withdrawals||[]).filter(x=>x.status==='pending').length;main.innerHTML=`<div class="dashboard-summary"><div class="dashboard-topbar"><div><p class="eyebrow">PORTFOLIO</p><h2>Welcome back</h2></div><span class="chip">Demo account</span></div><div class="ticker-strip">${tickers.map(([label,price,move])=>`<div class="ticker-item ${move.startsWith('+')?'positive':'negative'}"><span>${label}</span><strong>${price}</strong><em>${move}</em></div>`).join('')}</div><div class="stat-grid"><article class="card stat-card"><p>Available balance</p><strong>${money(balance,'USDT')}</strong><small>Admin-controlled ledger</small></article><article class="card stat-card"><p>Estimated profit</p><strong>${money(profit,'USDT')}</strong><small>+12.7% this cycle</small></article><article class="card stat-card"><p>Pending reviews</p><strong>${pendingDeck}</strong><small>Deposits & withdrawals</small></article><article class="card stat-card"><p>Account tier</p><strong>Gold</strong><small>KYC verified</small></article></div><div class="dashboard-panels"><section class="panel canvas-panel"><div class="panel-header"><div><p class="eyebrow">PERFORMANCE</p><h3>Portfolio overview</h3></div><span class="positive-pill">+12.7% YTD</span></div><div class="mini-chart">${bars.map(v=>`<span class="mini-bar" style="height:${v}%"></span>`).join('')}</div></section><aside class="panel"><div class="panel-header"><div><p class="eyebrow">VERIFICATION</p><h3>KYC & tier</h3></div></div><div class="tier-box"><strong>Gold tier</strong><span>Identity verified</span></div><ul class="check-list"><li>Profile validated</li><li>Risk review complete</li><li>Withdrawal verification enabled</li></ul></aside></div><div class="dashboard-panels"><section class="panel"><div class="panel-header"><div><p class="eyebrow">DEPOSITS</p><h3>Recent funding</h3></div><a href="new-deposit.html">Review</a></div>${(d.deposits||[]).length?`<ul class="activity-list">${(d.deposits||[]).slice(0,3).map(item=>`<li><div><strong>${money(item.amount,item.asset||'USDT')}</strong><span>${esc(item.status||'pending')}</span></div><small>${esc(date(item.created_at))}</small></li>`).join('')}</ul>`:'<div class="empty-state">No recent deposits yet.</div>'}</section><section class="panel"><div class="panel-header"><div><p class="eyebrow">WITHDRAWALS</p><h3>Request status</h3></div><a href="withdrawals.html">Open</a></div>${(d.withdrawals||[]).length?`<ul class="activity-list">${(d.withdrawals||[]).slice(0,3).map(item=>`<li><div><strong>${money(item.amount,item.asset||'USDT')}</strong><span>${esc(item.status||'pending')}</span></div><small>${esc(date(item.created_at))}</small></li>`).join('')}</ul>`:'<div class="empty-state">No recent withdrawals.</div>'}</section><section class="panel support-panel"><div class="panel-header"><div><p class="eyebrow">SUPPORT</p><h3>Account manager</h3></div></div><div class="support-box"><p>Need help with verification or a transfer?</p><button class="btn btn-primary" type="button">Contact support</button></div><div class="chat-preview"><div class="message-bubble incoming">Your document review is complete.</div><div class="message-bubble outgoing">Please confirm the transfer reference.</div></div></section></div><div class="dashboard-panels"><section class="panel"><div class="panel-header"><div><p class="eyebrow">ACTIVITY</p><h3>Recent transactions</h3></div></div><ul class="activity-list">${((d.transactions||[]).slice(0,4).length ? (d.transactions||[]).slice(0,4).map(item=>`<li><div><strong>${esc(item.kind||'transaction')}</strong><span>${esc(item.status||'pending')}</span></div><small>${money(item.amount,item.asset||'USDT')} · ${esc(date(item.created_at))}</small></li>`).join('') : '<li><div><strong>No recent activity</strong></div></li>')}</ul></section><section class="panel"><div class="panel-header"><div><p class="eyebrow">BANNERS</p><h3>Notifications</h3></div></div><ul class="notice-list"><li>Limited-time bonus window closes Friday.</li><li>KYC review approved for standard withdrawals.</li><li>Admin-set balance changes are audited automatically.</li></ul></section></div><div class="notice">This dashboard uses a demo trading-style layout. Real market feeds and trade execution are not connected in this starter project.</div></div>`;}
 else if(page==='new-deposit'){
