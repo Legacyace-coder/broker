@@ -18,6 +18,32 @@ function nav(){const publicItems=[['Home','index.html'],['About','pages/about.ht
 function footer(){document.querySelectorAll('[data-year]').forEach(n=>n.textContent=new Date().getFullYear());}
 function notice(msg,kind=''){return `<div class="status ${kind}" role="status">${esc(msg)}</div>`;}
 async function session(){if(!configured)return null;const client=await getSupabase();const {data}=await client.auth.getSession();return data.session||null;}
+function portalForRole(role){
+  return role === 'admin'
+    ? '../admin/index.html'
+    : role === 'member'
+      ? '../member/dashboard.html'
+      : null;
+}
+
+async function redirectForVerifiedRole({signOutUnknown=false}={}){
+  const client = await getSupabase();
+  const {data:{session:activeSession}} = await client.auth.getSession();
+
+  if (!activeSession?.access_token) return false;
+
+  const me = await api('/api/me');
+  const target = portalForRole(me?.profile?.role);
+
+  if (target) {
+    location.replace(target);
+    return true;
+  }
+
+  if (signOutUnknown) await client.auth.signOut();
+  return false;
+}
+
 async function api(path,options={}){const s=await session();if(!s?.access_token)throw new Error('Please sign in first.');const r=await fetch(`${API}${path}`,{...options,headers:{'Content-Type':'application/json','Authorization':`Bearer ${s.access_token}`,...(options.headers||{})}});let body={};try{body=await r.json()}catch{}if(!r.ok)throw new Error(body.detail||body.message||'Request failed');return body;}
 function pageHero(kicker,title,sub,actions='',variant=''){return `<section class="page-hero${variant?` ${variant}`:''}"><div class="container"><p class="eyebrow">${kicker}</p><h1>${title}</h1><p>${sub}</p>${actions?`<div class="hero-actions">${actions}</div>`:''}</div></section>`;}
 function cards(items,images=[]){return `<div class="grid grid-3">${items.map((x,i)=>`<article class="card${images[i]?' card-with-image':''}">${images[i]?`<img src="../assets/images/${encodeURIComponent(images[i].src).replace(/%2F/g,'/')}" alt="${esc(images[i].alt)}" loading="lazy">`:''}<div class="${images[i]?'card-image-copy':''}"><div class="card-number">0${i+1}</div><h3>${x[0]}</h3><p>${x[1]}</p></div></article>`).join('')}</div>`;}
@@ -96,84 +122,78 @@ async function renderPlans(){const target=$('#plans-list');if(!target)return;try
 let turnstileLoader;
 async function loadTurnstile(){if(window.turnstile)return window.turnstile;if(!turnstileLoader){turnstileLoader=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';script.async=true;script.defer=true;script.onload=()=>window.turnstile?resolve(window.turnstile):reject(new Error('Human verification did not load.'));script.onerror=()=>reject(new Error('Could not load human verification. Check your connection and try again.'));document.head.append(script);}).catch(error=>{turnstileLoader=null;throw error;});}return turnstileLoader;}
 function showRegistrationResult(success,message){const dialog=$('#auth-result-dialog');if(!dialog){$('#form-message').innerHTML=notice(message,success?'success':'error');return;}dialog.dataset.state=success?'success':'error';$('[data-auth-dialog-icon]',dialog).textContent=success?'✓':'!';$('#auth-dialog-title',dialog).textContent=success?'Account created':'Account creation failed';$('[data-auth-dialog-message]',dialog).textContent=message;if(typeof dialog.showModal==='function')dialog.showModal();else $('#form-message').innerHTML=notice(message,success?'success':'error');}
-async function handleAuth(){const form=$('#auth-form');if(!form)return;const kind=form.dataset.authKind;const out=$('#form-message');const submitButton=$('button[type="submit"]',form);let captchaToken='';let widgetId;const dialog=$('#auth-result-dialog');if(dialog){$('[data-auth-dialog-close]',dialog).addEventListener('click',()=>dialog.close());dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close();});}if(kind==='register'){const help=$('#captcha-help');if(!cfg.CAPTCHA_SITE_KEY||cfg.CAPTCHA_SITE_KEY.includes('YOUR_CLOUDFLARE')){help.textContent='Registration is unavailable until Turnstile is configured.';}else{try{const turnstile=await loadTurnstile();widgetId=turnstile.render('#turnstile-container',{sitekey:cfg.CAPTCHA_SITE_KEY,callback:token=>{captchaToken=token;submitButton.disabled=false;help.textContent='Human verification complete.';},'expired-callback':()=>{captchaToken='';submitButton.disabled=true;help.textContent='Verification expired. Complete the check again.';},'error-callback':()=>{captchaToken='';submitButton.disabled=true;help.textContent='Verification failed to load. Refresh the page and try again.';}});}catch(error){help.textContent=error.message;}}}form.addEventListener('submit',async e=>{e.preventDefault();const data=new FormData(form);try{const client=await getSupabase();let res;if(kind==='login'){res=await client.auth.signInWithPassword({email:data.get('email'),password:data.get('password')});if(res.error)throw res.error;location.href='../member/dashboard.html';return;}if(kind==='register'){if(data.get('password')!==data.get('password_confirm'))throw new Error('Passwords do not match.');if(!captchaToken)throw new Error('Complete the human verification before creating your account.');submitButton.disabled=true;res=await client.auth.signUp({email:data.get('email'),password:data.get('password'),options:{data:{full_name:data.get('full_name')},emailRedirectTo:location.origin+'/pages/login.html',captchaToken}});if(res.error)throw res.error;showRegistrationResult(true,'Your account has been created. If email confirmation is enabled, check your inbox to verify your address before signing in.');return;}res=await client.auth.resetPasswordForEmail(data.get('email'),{redirectTo:location.origin+'/pages/login.html'});if(res.error)throw res.error;out.innerHTML=notice('If the account exists, a password reset email has been requested.','success');}catch(err){if(kind==='register')showRegistrationResult(false,err.message||'We could not create your account. Please try again.');else out.innerHTML=notice(err.message||'Authentication failed.','error');if(kind==='register'&&widgetId!==undefined){captchaToken='';submitButton.disabled=true;window.turnstile?.reset(widgetId);$('#captcha-help').textContent='Please complete the human verification again.';}}finally{if(kind==='register'&&!dialog?.open&&widgetId!==undefined)submitButton.disabled=!captchaToken;}});}
+async function handleAuth(){const form=$('#auth-form');if(!form)return;const kind=form.dataset.authKind;const out=$('#form-message');const submitButton=$('button[type="submit"]',form);let captchaToken='';let widgetId;const dialog=$('#auth-result-dialog');if(dialog){$('[data-auth-dialog-close]',dialog).addEventListener('click',()=>dialog.close());dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close();});}if(kind==='register'){const help=$('#captcha-help');if(!cfg.CAPTCHA_SITE_KEY||cfg.CAPTCHA_SITE_KEY.includes('YOUR_CLOUDFLARE')){help.textContent='Registration is unavailable until Turnstile is configured.';}else{try{const turnstile=await loadTurnstile();widgetId=turnstile.render('#turnstile-container',{sitekey:cfg.CAPTCHA_SITE_KEY,callback:token=>{captchaToken=token;submitButton.disabled=false;help.textContent='Human verification complete.';},'expired-callback':()=>{captchaToken='';submitButton.disabled=true;help.textContent='Verification expired. Complete the check again.';},'error-callback':()=>{captchaToken='';submitButton.disabled=true;help.textContent='Verification failed to load. Refresh the page and try again.';}});}catch(error){help.textContent=error.message;}}}form.addEventListener('submit',async e=>{e.preventDefault();const data=new FormData(form);try{const client=await getSupabase();let res;if(kind==='login'){
+  res=await client.auth.signInWithPassword({
+    email:data.get('email'),
+    password:data.get('password')
+  });
+  if(res.error)throw res.error;
+  submitButton.disabled=true;
+  try{
+    const redirected=await redirectForVerifiedRole({signOutUnknown:true});
+    if(!redirected){
+      throw new Error('This account does not have an authorised member or administrator role. Contact support.');
+    }
+  }catch(routeError){
+    await client.auth.signOut();
+    throw routeError;
+  }
+  return;
+}if(kind==='register'){if(data.get('password')!==data.get('password_confirm'))throw new Error('Passwords do not match.');if(!captchaToken)throw new Error('Complete the human verification before creating your account.');submitButton.disabled=true;res=await client.auth.signUp({email:data.get('email'),password:data.get('password'),options:{data:{full_name:data.get('full_name')},emailRedirectTo:location.origin+'/pages/login.html',captchaToken}});if(res.error)throw res.error;showRegistrationResult(true,'Your account has been created. If email confirmation is enabled, check your inbox to verify your address before signing in.');return;}res=await client.auth.resetPasswordForEmail(data.get('email'),{redirectTo:location.origin+'/pages/login.html'});if(res.error)throw res.error;out.innerHTML=notice('If the account exists, a password reset email has been requested.','success');}catch(err){if(kind==='register')showRegistrationResult(false,err.message||'We could not create your account. Please try again.');else out.innerHTML=notice(err.message||'Authentication failed.','error');if(kind==='register'&&widgetId!==undefined){captchaToken='';submitButton.disabled=true;window.turnstile?.reset(widgetId);$('#captcha-help').textContent='Please complete the human verification again.';}}finally{if(kind==='register'&&!dialog?.open&&widgetId!==undefined)submitButton.disabled=!captchaToken;}});}
 
 async function protect() {
-  const protectedPages = [
-    'dashboard',
-    'new-deposit',
-    'deposit-history',
-    'investments',
-    'withdrawals',
-    'transactions',
-    'partner-program',
-    'profile'
+  const memberPages = [
+    'dashboard', 'new-deposit', 'deposit-history', 'investments',
+    'withdrawals', 'transactions', 'partner-program', 'profile'
   ];
-
   const isAdmin = page.startsWith('admin-');
+  const isMember = memberPages.includes(page);
 
-  if (!protectedPages.includes(page) && !isAdmin) {
-    return true;
-  }
+  if (!isAdmin && !isMember) return true;
 
   if (!configured) {
-    app.innerHTML = `
-      <section class="section">
-        <div class="container">
-          ${notice(
-            'Configure Supabase in assets/js/config.js to use the member portal.',
-            'error'
-          )}
-          <a class="btn btn-primary" href="../pages/login.html">
-            Go to login
-          </a>
-        </div>
-      </section>
-    `;
+    app.innerHTML = `<section class="section"><div class="container">
+      ${notice('Configure Supabase in assets/js/config.js to use the portal.', 'error')}
+      <a class="btn btn-primary" href="../pages/login.html">Go to login</a>
+    </div></section>`;
     return false;
   }
 
   try {
-    const s = await session();
+    const activeSession = await session();
 
-    if (!s) {
-      location.href = '../pages/login.html';
+    if (!activeSession) {
+      location.replace('../pages/login.html');
       return false;
     }
 
-    await api('/api/me');
+    const me = await api('/api/me');
+    const role = me?.profile?.role;
+    const target = portalForRole(role);
 
-    if (isAdmin) {
-      await api('/api/admin/overview');
+    if (!target) {
+      const client = await getSupabase();
+      await client.auth.signOut();
+      location.replace('../pages/login.html');
+      return false;
     }
 
+    if (isAdmin && role !== 'admin') {
+      location.replace(target);
+      return false;
+    }
+
+    if (isMember && role !== 'member') {
+      location.replace(target);
+      return false;
+    }
+
+    if (isAdmin) await api('/api/admin/overview');
     return true;
   } catch (err) {
-    if (String(err.message).includes('Administrator')) {
-      app.innerHTML = `
-        <section class="section">
-          <div class="container">
-            ${notice(
-              'Administrator access is required for this page.',
-              'error'
-            )}
-            <a class="btn btn-outline" href="../member/dashboard.html">
-              Member dashboard
-            </a>
-          </div>
-        </section>
-      `;
-      return false;
-    }
-
-    app.innerHTML = `
-      <section class="section">
-        <div class="container">
-          ${notice(err.message || 'Unable to load your account.', 'error')}
-        </div>
-      </section>
-    `;
-
+    app.innerHTML = `<section class="section"><div class="container">
+      ${notice(err.message || 'Unable to load your account.', 'error')}
+    </div></section>`;
     return false;
   }
 }
@@ -240,5 +260,40 @@ $('#bank-instructions-form').addEventListener('submit',async event=>{event.preve
 else if(page==='admin-partners'){main.innerHTML=`<div class="empty-state"><h2>Configuration required</h2><p>This module is intentionally not active until its policy and operational requirements are defined.</p></div>`;}
 }catch(err){main.innerHTML=notice(err.message||'Unable to load records.','error');}}
 function bindPublic(){document.querySelectorAll('.faq-question').forEach(b=>b.addEventListener('click',()=>{const item=b.closest('.faq-item');const open=item.classList.toggle('open');b.setAttribute('aria-expanded',String(open));b.querySelector('span').textContent=open?'−':'＋';}));const f=$('#contact-form');f?.addEventListener('submit',e=>{e.preventDefault();$('#form-message').innerHTML=notice('Form fields validated. No message has been sent; configure a support endpoint before launch.','success');});}
-async function init(){nav();footer();if(publicContent[page]){app.innerHTML=publicContent[page]();bindPublic();if(page==='plans')renderPlans();if(['login','register','forgot-password'].includes(page))handleAuth();return;}if(page==='home'){app.innerHTML=home();bindPublic();const principles=[...app.querySelectorAll('.section')].find(section=>section.querySelector('.eyebrow')?.textContent==='OUR PRINCIPLES');principles?.classList.add('home-principles');setupHeroCarousel();return;}if(await protect())await memberPage();}
+async function init(){
+  nav();
+  footer();
+
+  if (page === 'login') {
+    try {
+      if (await redirectForVerifiedRole({signOutUnknown:true})) return;
+    } catch (error) {
+      app.innerHTML = `<section class="section"><div class="container">
+        ${notice(error.message || 'Unable to verify your account. Please try again.', 'error')}
+        <a class="btn btn-outline" href="../pages/login.html">Continue to login</a>
+      </div></section>`;
+      return;
+    }
+  }
+
+  if (publicContent[page]) {
+    app.innerHTML = publicContent[page]();
+    bindPublic();
+    if (page === 'plans') renderPlans();
+    if (['login', 'register', 'forgot-password'].includes(page)) handleAuth();
+    return;
+  }
+
+  if (page === 'home') {
+    app.innerHTML = home();
+    bindPublic();
+    const principles = [...app.querySelectorAll('.section')]
+      .find(section => section.querySelector('.eyebrow')?.textContent === 'OUR PRINCIPLES');
+    principles?.classList.add('home-principles');
+    setupHeroCarousel();
+    return;
+  }
+
+  if (await protect()) await memberPage();
+}
 init();
