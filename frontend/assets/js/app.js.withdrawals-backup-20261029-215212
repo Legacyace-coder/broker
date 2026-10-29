@@ -1,0 +1,478 @@
+const cfg = window.NORTHSTAR_CONFIG || {};
+const configured = cfg.SUPABASE_URL && !cfg.SUPABASE_URL.includes('YOUR_PROJECT') && cfg.SUPABASE_ANON_KEY && !cfg.SUPABASE_ANON_KEY.includes('YOUR_PUBLIC');
+let supabase = null;
+let supabaseClientPromise = null;
+async function getSupabase(){if(!configured)throw new Error('Configure Supabase first.');if(!supabaseClientPromise)supabaseClientPromise=import('https://esm.sh/@supabase/supabase-js@2.49.1').then(({createClient})=>{supabase=createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY);return supabase;}).catch(error=>{supabaseClientPromise=null;throw new Error(`Could not load the authentication client: ${error.message}`);});return supabaseClientPromise;}
+const API = cfg.API_BASE_URL || 'https://broker-backend-delta.vercel.app';
+const page = document.body.dataset.page || 'home';
+const app = document.querySelector('#app');
+const $ = (sel, root=document) => root.querySelector(sel);
+const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+const esc = (v='') => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money = (v, asset='USDT') => `${Number(v || 0).toLocaleString(undefined,{maximumFractionDigits:4})} ${esc(asset)}`;
+const date = v => v ? new Date(v).toLocaleString() : '—';
+const status = s => `<span class="badge ${esc(s||'pending')}">${esc(s||'pending')}</span>`;
+const pageLinks = {home:'index.html',about:'pages/about.html',responsibility:'pages/corporate-responsibility.html','digital-assets':'pages/digital-assets.html','real-estate':'pages/real-estate.html',agriculture:'pages/agriculture.html',plans:'pages/plans.html',faq:'pages/faq.html',contact:'pages/contact.html',login:'pages/login.html',register:'pages/register.html','forgot-password':'pages/forgot-password.html',terms:'pages/terms.html'};
+const root = location.pathname.includes('/pages/') || location.pathname.includes('/member/') || location.pathname.includes('/admin/') ? '../' : '';
+function nav(){const publicItems=[['Home','index.html'],['About','pages/about.html'],['Responsibility','pages/corporate-responsibility.html'],['Sectors','pages/digital-assets.html'],['Plans','pages/plans.html'],['FAQs','pages/faq.html'],['Contact','pages/contact.html']];const memberItems=[['Dashboard','member/dashboard.html'],['Deposit','member/new-deposit.html'],['Withdraw','member/withdrawals.html'],['Transactions','member/transactions.html'],['Profile','member/profile.html']];const isMember=page.startsWith('admin-')||['dashboard','new-deposit','deposit-history','investments','withdrawals','transactions','partner-program','profile'].includes(page);const items=isMember?memberItems:publicItems;const n=$('#main-nav');n.innerHTML=items.map(([t,p])=>`<a href="${root}${p}">${t}</a>`).join('')+(isMember?`<a href="${root}index.html" data-logout>Sign out</a>`:`<a class="btn btn-outline" href="${root}pages/login.html">Login</a><a class="btn btn-primary" href="${root}pages/register.html">Create account</a>`);$('.menu-toggle')?.addEventListener('click',()=>{const open=n.classList.toggle('open');$('.menu-toggle').setAttribute('aria-expanded',String(open));});$('.site-header')?.classList.toggle('scrolled',window.scrollY>12);window.addEventListener('scroll',()=>$('.site-header')?.classList.toggle('scrolled',window.scrollY>12),{passive:true});$('[data-logout]')?.addEventListener('click',async e=>{e.preventDefault();if(supabase)await supabase.auth.signOut();location.href='../pages/login.html';});}
+function footer(){document.querySelectorAll('[data-year]').forEach(n=>n.textContent=new Date().getFullYear());}
+function notice(msg,kind=''){return `<div class="status ${kind}" role="status">${esc(msg)}</div>`;}
+async function session(){if(!configured)return null;const client=await getSupabase();const {data}=await client.auth.getSession();return data.session||null;}
+function portalForRole(role){
+  return role === 'admin'
+    ? '../admin/index.html'
+    : role === 'member'
+      ? '../member/dashboard.html'
+      : null;
+}
+
+async function redirectForVerifiedRole({signOutUnknown=false}={}){
+  const client = await getSupabase();
+  const {data:{session:activeSession}} = await client.auth.getSession();
+
+  if (!activeSession?.access_token) return false;
+
+  const me = await api('/api/me');
+  const target = portalForRole(me?.profile?.role);
+
+  if (target) {
+    location.replace(target);
+    return true;
+  }
+
+  if (signOutUnknown) await client.auth.signOut();
+  return false;
+}
+
+async function api(path,options={}){const s=await session();if(!s?.access_token)throw new Error('Please sign in first.');const headers={'Authorization':`Bearer ${s.access_token}`,...(options.headers||{})};if(!(options.body instanceof FormData)&&options.body!==undefined&&!headers['Content-Type'])headers['Content-Type']='application/json';const r=await fetch(`${API}${path}`,{...options,headers});let body={};try{body=await r.json()}catch{}if(!r.ok)throw new Error(body.detail||body.message||'Request failed');return body;}
+function pageHero(kicker,title,sub,actions='',variant=''){return `<section class="page-hero${variant?` ${variant}`:''}"><div class="container"><p class="eyebrow">${kicker}</p><h1>${title}</h1><p>${sub}</p>${actions?`<div class="hero-actions">${actions}</div>`:''}</div></section>`;}
+function cards(items,images=[]){return `<div class="grid grid-3">${items.map((x,i)=>`<article class="card${images[i]?' card-with-image':''}">${images[i]?`<img src="../assets/images/${encodeURIComponent(images[i].src).replace(/%2F/g,'/')}" alt="${esc(images[i].alt)}" loading="lazy">`:''}<div class="${images[i]?'card-image-copy':''}"><div class="card-number">0${i+1}</div><h3>${x[0]}</h3><p>${x[1]}</p></div></article>`).join('')}</div>`;}
+function table(headers,rows){if(!rows?.length)return `<div class="empty-state">No records to display yet.</div>`;return `<div class="table-wrap"><table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;}
+function rows(items,cols){return table(cols.map(c=>c[1]),items.map(item=>`<tr>${cols.map(([key])=>`<td>${key==='status'?status(item[key]):key==='amount'?money(item[key],item.asset):key.endsWith('_at')||key==='created_at'?esc(date(item[key])):esc(item[key]??'—')}</td>`).join('')}</tr>`));}
+function placeholderImage(image,alt){return `<figure class="image-placeholder image-feature"><img src="../assets/images/${encodeURIComponent(image).replace(/%2F/g,'/')}" alt="${esc(alt)}" loading="lazy"></figure>`;}
+function home(){return `<section class="hero"><div class="container hero-content"><p class="eyebrow">NORTHSTAR CAPITAL <span class="hero-label">RESEARCH-LED PERSPECTIVE</span></p><h1>Navigate change<br><span>with clarity.</span></h1><p>Explore digital assets, real estate and agriculture with a considered view of opportunity, uncertainty and risk.</p><div class="hero-actions"><a class="btn btn-primary" href="pages/plans.html">Explore our services</a><a class="btn btn-outline" href="pages/about.html">Our approach</a></div><div class="hero-proof"><span>Independent thinking</span><span>Clear communication</span><span>Risk-aware research</span></div></div><div class="hero-orbit" aria-hidden="true"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="orbit-core">N<span>★</span></div></div></section><section class="section"><div class="container"><div class="section-heading"><p class="eyebrow">AREAS OF FOCUS</p><h2>Different markets.<br>One thoughtful approach.</h2><p>Understand the underlying landscape before making a decision.</p></div><div class="grid grid-3">${[['01','Digital assets','Blockchain infrastructure, market structure and custody risk.','pages/digital-assets.html'],['02','Real estate','Property fundamentals, ownership, liquidity and due diligence.','pages/real-estate.html'],['03','Agriculture','Production, processing, supply chains and market access.','pages/agriculture.html']].map(([n,title,copy,href])=>`<a class="focus-card" href="${href}"><span class="focus-index">${n} / RESEARCH</span><h3>${title}</h3><p>${copy}</p><span class="focus-arrow" aria-hidden="true">↗</span></a>`).join('')}</div></div></section><section class="section section-alt"><div class="container grid grid-2"><div><p class="eyebrow">A CLEARER VIEW</p><h2>Context before conviction.</h2><p>Markets move. Information changes. We focus on explaining the factors that shape decisions—not on predictions or promises.</p><a class="text-link" href="pages/about.html">Learn how we think <span aria-hidden="true">→</span></a></div><div class="market-note"><span class="market-note-label">NORTHSTAR / MARKET NOTE</span><div class="market-note-rule"></div><strong>Clarity is a process.</strong><p>Research, understand trade-offs, and make decisions that reflect your circumstances.</p><span class="market-note-foot">GENERAL INFORMATION ONLY · NOT INVESTMENT ADVICE</span></div></div></section><section class="section"><div class="container"><div class="section-heading"><p class="eyebrow">OUR PRINCIPLES</p><h2>Designed around trust.</h2></div>${cards([['Research & due diligence','Evaluate relevant information before making decisions.'],['Security & accountability','Protect accounts, document actions and restrict access.'],['Risk awareness','Communicate uncertainty, costs and limitations clearly.']])}</div></section><section class="section cta-section"><div class="container"><p class="eyebrow">START A CONVERSATION</p><h2>Make room for better questions.</h2><p>Talk to our team or create an account to access the member portal.</p><div class="hero-actions"><a class="btn btn-primary" href="pages/contact.html">Contact us</a><a class="btn btn-outline" href="pages/register.html">Create account</a></div></div></section>`;}
+function setupHeroCarousel(){
+ const hero=$('.hero',app);
+ if(!hero)return;
+ const slides=[
+  {label:'INDEPENDENT THINKING',title:'Independent thinking.<br><span>Grounded in research.</span>',copy:'We take a considered view of digital assets, real estate and agriculture—separating evidence from noise.',proof:'Independent thinking'},
+  {label:'CLEAR COMMUNICATION',title:'Clear communication.<br><span>Thoughtful decisions.</span>',copy:'Understand complex markets through clear explanations of opportunity, uncertainty and risk.',proof:'Clear communication'},
+  {label:'RISK-AWARE RESEARCH',title:'Risk-aware research.<br><span>Perspective first.</span>',copy:'We examine trade-offs, uncertainty and potential downside before framing an opportunity.',proof:'Risk-aware research'}
+ ];
+ hero.classList.add('hero-carousel');
+ hero.innerHTML=`<div class="hero-backdrops" aria-hidden="true"><div class="hero-backdrop is-active"></div><div class="hero-backdrop"></div><div class="hero-backdrop"></div></div><div class="container hero-content"><div class="hero-copy" data-hero-copy><p class="eyebrow">NORTHSTAR CAPITAL <span class="hero-label" data-hero-label></span></p><h1 data-hero-title></h1><p data-hero-description></p><div class="hero-actions"><a class="btn btn-primary" href="pages/plans.html">Explore our services</a><a class="btn btn-outline" href="pages/about.html">Our approach</a></div><div class="hero-proof" aria-label="Our principles"><span>Independent thinking</span><span>Clear communication</span><span>Risk-aware research</span></div></div><div class="hero-carousel-controls" aria-label="Homepage highlights"><button class="hero-arrow" type="button" data-hero-prev aria-label="Previous highlight">‹</button><div class="hero-dots">${slides.map((slide,index)=>`<button class="hero-dot${index===0?' is-active':''}" type="button" data-hero-slide="${index}" aria-label="Show ${slide.label.toLowerCase()} highlight" aria-pressed="${index===0}"></button>`).join('')}</div><button class="hero-arrow" type="button" data-hero-next aria-label="Next highlight">›</button><span class="sr-only" data-hero-status role="status" aria-live="polite"></span></div></div>`;
+ const backdrops=$$('.hero-backdrop',hero);
+ const title=$('[data-hero-title]',hero);
+ const description=$('[data-hero-description]',hero);
+ const label=$('[data-hero-label]',hero);
+ const copy=$('[data-hero-copy]',hero);
+ const dots=$$('.hero-dot',hero);
+ const status=$('[data-hero-status]',hero);
+ const reduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
+ let active=0;
+ let timer;
+ let pointerPaused=false;
+ let focusPaused=false;
+ const render=(index,announce=false)=>{
+  active=(index+slides.length)%slides.length;
+  const slide=slides[active];
+  backdrops.forEach((element,i)=>{element.classList.toggle('is-active',i===active);});
+  dots.forEach((element,i)=>{const selected=i===active;element.classList.toggle('is-active',selected);element.setAttribute('aria-pressed',String(selected));});
+  copy.classList.remove('is-changing');
+  title.innerHTML=slide.title;
+  description.textContent=slide.copy;
+  label.textContent=slide.label;
+  $$('.hero-proof span',hero).forEach(element=>element.classList.toggle('is-highlighted',element.textContent===slide.proof));
+  void copy.offsetWidth;
+  copy.classList.add('is-changing');
+  if(announce)status.textContent=`${slide.label}: ${slide.copy}`;
+ };
+ const stop=()=>{window.clearInterval(timer);timer=undefined;};
+ const start=()=>{stop();if(!pointerPaused&&!focusPaused&&!reduceMotion.matches&&!document.hidden)timer=window.setInterval(()=>render(active+1),6500);};
+ dots.forEach((button,index)=>button.addEventListener('click',()=>{render(index,true);start();}));
+ $('[data-hero-prev]',hero).addEventListener('click',()=>{render(active-1,true);start();});
+ $('[data-hero-next]',hero).addEventListener('click',()=>{render(active+1,true);start();});
+ hero.addEventListener('pointerenter',()=>{pointerPaused=true;stop();});
+ hero.addEventListener('pointerleave',()=>{pointerPaused=false;start();});
+ hero.addEventListener('focusin',()=>{focusPaused=true;stop();});
+ hero.addEventListener('focusout',event=>{if(!hero.contains(event.relatedTarget)){focusPaused=false;start();}});
+ hero.addEventListener('keydown',event=>{if(event.key==='ArrowRight'){event.preventDefault();render(active+1,true);start();}else if(event.key==='ArrowLeft'){event.preventDefault();render(active-1,true);start();}});
+ document.addEventListener('visibilitychange',start);
+ reduceMotion.addEventListener?.('change',start);
+ render(0);
+ start();
+}
+const publicContent={
+ about:()=>`${pageHero('WHO WE ARE','Building with purpose.<br><span>Investing with perspective.</span>','Discover the principles, people and long-term thinking behind Northstar Capital.','','page-hero--company')}<section class="section"><div class="container grid grid-2"><div><p class="eyebrow">OUR STORY</p><h2>A thoughtful approach to a changing world.</h2><p>Northstar Capital is a company concept focused on exploring opportunities across digital assets, property and agriculture. Our approach places research, transparency and responsible decision-making at the centre of the process.</p><p>Our ambition is to build a business that values enduring relationships over short-term promises.</p></div>${placeholderImage('company-team1 .jpg','A diverse team working together around a table.')}</div></section><section class="section section-alt"><div class="container"><div class="section-heading"><p class="eyebrow">WHAT GUIDES US</p><h2>Our principles</h2></div>${cards([['Integrity','Communicate honestly and take responsibility.'],['Research','Evaluate opportunities instead of relying on hype.'],['Long-term thinking','Consider resilience and risk over time.']],[{src:'integrity cta image.jpg',alt:'Integrity represented by a handshake.'},{src:'research cta image.jpg',alt:'A researcher reviewing information.'},{src:'long term thinking cta image.jpg',alt:'A team supporting a bright idea.'}])}</div></section>`,
+ responsibility:()=>`${pageHero('RESPONSIBLE BUSINESS','Progress should be<br><span>built responsibly.</span>','A proposed framework for ethical conduct, governance and long-term thinking.','','page-hero--responsibility')}<section class="section"><div class="container grid grid-2"><div><h2>Responsibility is part of the process.</h2><p>Responsible business means considering more than immediate financial outcomes. It means asking how decisions are made, who may be affected and what risks could emerge over time.</p></div>${placeholderImage('RESPONSIBLE BUSINESS IMAGE.jpg','Business leaders working together toward shared goals.')}</div></section><section class="section section-alt"><div class="container">${cards([['Governance','Clear responsibilities, documented processes and oversight.'],['People and communities','Respectful workplaces and constructive relationships.'],['Environmental awareness','Assess relevant environmental effects and sustainability.']],[{src:'governance cta image.jpg',alt:'A connected governance and operations network.'},{src:'people and community cta image.jpg',alt:'People sharing an idea collaboratively.'},{src:'environmental awareness cta image.jpg',alt:'A seedling and the Earth symbolising environmental care.'}])}</div></section>`,
+ 'digital-assets':()=>sector('OUR SECTORS / 01','Understanding the<br><span>digital asset economy.</span>','Explore blockchain-based assets, digital infrastructure and the opportunities and risks shaping this evolving sector.',[['Blockchain infrastructure','Distributed ledgers, transaction validation and protocol design.'],['Digital asset markets','Liquidity, volatility, market structure and speculative risk.'],['Custody and security','Wallet security, private-key management and counterparty risk.']],'sector page image.jpg','A digital asset coin in a field.','digital-assets',[{src:'blockchain.jpg',alt:'Blockchain technology network illustration.'},{src:'digital assets.jpg',alt:'Digital asset and cryptocurrency security illustration.'},{src:'custody and security background.jpg',alt:'Digital asset custody and security illustration.'}]),
+ 'real-estate':()=>sector('OUR SECTORS / 02','Value built<br><span>for the long term.</span>','Explore property markets, real assets and the factors that influence long-term performance.',[['Residential property','Demand, affordability, occupancy and maintenance.'],['Commercial property','Tenant quality, lease terms and operating expenses.'],['Industrial and logistics','Transport access, infrastructure and market demand.']],'real estate.jpg','A home, savings and a calculator illustrating property finance.','real-estate'),
+ agriculture:()=>sector('OUR SECTORS / 03','Supporting the<br><span>future of food.</span>','Explore agricultural production, processing, storage and market access.',[['Primary production','Crop cultivation, livestock and suitable operating inputs.'],['Processing and storage','Handling, preservation and post-harvest loss reduction.'],['Distribution and markets','Transport and commercial relationships connecting producers and customers.']],'agriculture.jpg','An agricultural field with the word Agro.','agriculture'),
+ plans:()=>`${pageHero('SERVICES & CATEGORIES','Choose clarity<br><span>before commitment.</span>','Review the service categories below. These are illustrative categories, not offers of guaranteed investment returns.','','page-hero--sector')}<section class="section"><div class="container"><div id="plans-list" class="grid grid-3"><div class="loading">Loading available categories…</div></div><div class="notice" style="margin-top:28px">No plan guarantees a return. Investment products, where legally offered, require verified disclosures, risk assessment, applicable authorisation and written terms. Do not send funds based only on this demonstration site.</div></div></section>`,
+ faq:()=>`${pageHero('HELP CENTRE','Frequently asked<br><span>questions.</span>','Find answers about accounts, records, requests and security.','','page-hero--faq')}<section class="section"><div class="container" style="max-width:850px">${[['How do I create an account?','Use the registration page with an email address and password. Confirm your email if your project settings require it.'],['Does a deposit request mean funds were received?','No. A request is a record only. Crypto transfers and bank payments are manually reconciled before any USDT is credited. A bank transfer may be credited at a different USDT amount after review.'],['How do withdrawals work?','A withdrawal request reserves the requested USDT amount. Admin approval records a decision but does not send funds; a transfer reference is recorded when the payment is marked complete.'],['Can I pay by card?','Card payments are not currently available. A payment processor must be selected and integrated before card checkout is enabled.'],['Are returns guaranteed?','No. Investment outcomes are uncertain and losses are possible. Treat claims of guaranteed high returns with caution.'],['How do I protect my account?','Use a unique password, protect your email, never share authentication codes and contact support if you suspect unauthorised access.'],['How can I recover my password?','Use the password recovery page to request a reset email.']].map(([q,a])=>`<div class="faq-item"><button class="faq-question" aria-expanded="false">${q}<span>＋</span></button><div class="faq-answer">${a}</div></div>`).join('')}</div></section>`,
+ contact:()=>`${pageHero('CONTACT','Let’s start a<br><span>conversation.</span>','Send a message to the team. This demo form validates locally; connect a support inbox or backend endpoint before launch.','','page-hero--contact')}<section class="section"><div class="container grid grid-2"><div><p class="eyebrow">GET IN TOUCH</p><h2>We welcome your questions.</h2><p>Replace this section with verified company contact details, office address and support hours before publishing.</p><div class="notice">No real support message is sent until a delivery provider or backend contact endpoint is configured.</div></div><form class="form-card form-grid" id="contact-form"><div class="field"><label for="contact-name">Full name</label><input id="contact-name" name="name" required maxlength="120"></div><div class="field"><label for="contact-email">Email</label><input id="contact-email" name="email" type="email" required></div><div class="field"><label for="contact-subject">Subject</label><input id="contact-subject" name="subject" required maxlength="160"></div><div class="field"><label for="contact-message">Message</label><textarea id="contact-message" name="message" required maxlength="4000"></textarea></div><button class="btn btn-primary" type="submit">Validate message</button><div id="form-message" aria-live="polite"></div></form></div></section>`,
+ login:()=>authForm('Sign in','Welcome back. Sign in to access your account.','login'),
+ register:()=>authForm('Create your account','Register with your email and a strong password.','register'),
+ 'forgot-password':()=>authForm('Reset your password','We’ll request a password reset email if your account exists.','forgot-password'),
+ terms:()=>`${pageHero('LEGAL INFORMATION','Terms of use','These starter terms are a placeholder and must be reviewed by qualified counsel before the website is used commercially.')}<section class="section"><div class="container" style="max-width:850px"><h2>1. Informational use</h2><p>This website starter provides general information only. It is not financial, legal, tax or investment advice, and it is not an offer to buy or sell a financial product.</p><h2>2. Risk</h2><p>Investments can lose value. Digital assets can be highly volatile, property may be illiquid, and agriculture is exposed to operating and environmental risks. Past performance does not guarantee future results.</p><h2>3. Account security</h2><p>Users are responsible for safeguarding their login credentials and reporting suspected unauthorised activity.</p><h2>4. Requests and transfers</h2><p>Recording a deposit or withdrawal request does not establish that a payment has been received or sent. Any actual payment must be confirmed by the relevant payment provider and reconciled.</p><h2>5. Company details and jurisdiction</h2><p>Replace this text with the verified legal entity name, registration information, applicable jurisdiction, complaint procedure and professionally reviewed terms before launch.</p></div></section>`
+};
+function sector(kicker,title,sub,items,image,imageAlt,sectorName,images=[]){const hero=pageHero(kicker,title,sub,`<a class="btn btn-primary" href="contact.html">Discuss this sector</a>`).replace('<section class="page-hero">',`<section class="page-hero sector-page-hero sector-page-hero--${sectorName}">`);return `${hero}<section class="section"><div class="container grid grid-2"><div><p class="eyebrow">OUR APPROACH</p><h2>Understand the fundamentals.</h2><p>Each asset class has its own risks, costs and operating conditions. Research and due diligence should come before any commitment.</p><p>Values can decline and an investment may not be easy to sell. No outcome is guaranteed.</p></div><figure class="sector-image"><img src="../assets/images/${encodeURIComponent(image).replace(/%2F/g,'/')}" alt="${esc(imageAlt)}" loading="lazy"></figure></div></section><section class="section section-alt"><div class="container"><div class="section-heading"><p class="eyebrow">AREAS TO UNDERSTAND</p><h2>Explore the landscape</h2></div>${cards(items,images)}</div></section>`;}
+function authForm(title,sub,kind){let fields=kind==='register'?`<div class="field"><label for="full-name">Full name</label><input id="full-name" name="full_name" required maxlength="120" autocomplete="name"></div>`:'';if(kind==='login')fields+=`<div class="field"><label for="email">Email</label><input id="email" name="email" type="email" required autocomplete="email"></div><div class="field"><label for="password">Password</label><input id="password" name="password" type="password" required autocomplete="current-password"></div><p class="form-note"><a href="forgot-password.html">Forgot password?</a></p>`;else if(kind==='register')fields+=`<div class="field"><label for="tether-trc20-wallet">Your Tether (USDT TRC20) wallet address</label><input id="tether-trc20-wallet" name="tether_trc20_wallet" type="text" required maxlength="220" autocomplete="off" placeholder="Enter your TRC20 receiving address"></div><div class="field"><label for="bitcoin-wallet">Your Bitcoin wallet address</label><input id="bitcoin-wallet" name="bitcoin_wallet" type="text" required maxlength="220" autocomplete="off" placeholder="Enter your Bitcoin receiving address"></div><div class="field"><label for="usdc-wallet">Your USDC wallet address</label><input id="usdc-wallet" name="usdc_wallet" type="text" required maxlength="220" autocomplete="off" placeholder="Enter your USDC receiving address and ensure the network is correct"></div><div class="field"><label for="email">Email Address</label><input id="email" name="email" type="email" required autocomplete="email"></div><div class="field"><label for="email-confirm">Confirm Email Address</label><input id="email-confirm" name="email_confirm" type="email" required autocomplete="email" placeholder="Re-enter your email address"></div><div class="field"><label for="password">Password</label><input id="password" name="password" type="password" required minlength="10" autocomplete="new-password"><small class="form-note">Use at least 10 characters.</small></div><div class="field"><label for="password-confirm">Confirm password</label><input id="password-confirm" name="password_confirm" type="password" required minlength="10" autocomplete="new-password"></div><label class="form-note"><input type="checkbox" name="terms" required> I agree to the terms of use.</label><div class="captcha-field"><span class="captcha-label">Human verification</span><div id="turnstile-container" class="turnstile-container"></div><small id="captcha-help" class="form-note" aria-live="polite">Loading human verification…</small></div>`;else fields=`<div class="field"><label for="email">Account email</label><input id="email" name="email" type="email" required autocomplete="email"></div>`;const registration=kind==='register';const captchaReady=cfg.CAPTCHA_SITE_KEY&&!cfg.CAPTCHA_SITE_KEY.includes('YOUR_CLOUDFLARE');return `${pageHero('SECURE ACCOUNT',title,sub,'','page-hero--auth')}<section class="section"><form class="form-card form-grid" id="auth-form" data-auth-kind="${kind}">${!configured?notice('Setup required: add your Supabase URL and public key in assets/js/config.js before using authentication.','error'):''}${registration&&!captchaReady?notice('Setup required: configure a Cloudflare Turnstile site key and enable Turnstile in Supabase Auth before registrations can be submitted.','error'):''}${fields}<button class="btn btn-primary" type="submit"${registration?' disabled':''}>${kind==='login'?'Sign in':registration?'Create account':'Send reset email'}</button><div id="form-message" aria-live="polite"></div><p class="form-note">${kind==='login'?`New here? <a href="register.html">Create an account</a>`:registration?`Already registered? <a href="login.html">Sign in</a>`:`<a href="login.html">Back to sign in</a>`}</p></form>${registration?`<dialog class="auth-dialog" id="auth-result-dialog" aria-labelledby="auth-dialog-title"><div class="auth-dialog-content"><span class="auth-dialog-icon" data-auth-dialog-icon aria-hidden="true"></span><h2 id="auth-dialog-title"></h2><p data-auth-dialog-message></p><button class="btn btn-primary" type="button" data-auth-dialog-close>Continue</button></div></dialog>`:''}</section>`;}
+async function renderPlans(){const target=$('#plans-list');if(!target)return;try{const r=await fetch(`${API}/api/plans`);const d=await r.json();const items=d.items||[];target.innerHTML=items.map(p=>`<article class="card"><p class="eyebrow">SERVICE CATEGORY</p><h3>${esc(p.name)}</h3><p>${esc(p.description||'Contact us for further information.')}</p><p><strong>${money(p.minimum_amount)}</strong>${p.maximum_amount?` – ${money(p.maximum_amount)}`:'+'}</p><p class="form-note">Eligibility and terms must be independently verified.</p><a class="btn btn-outline" href="contact.html">Enquire</a></article>`).join('')||'<div class="empty-state">No categories are published yet.</div>';}catch{target.innerHTML='<div class="empty-state">Service categories are temporarily unavailable. Check that the API is running.</div>';}}
+let turnstileLoader;
+async function loadTurnstile(){if(window.turnstile)return window.turnstile;if(!turnstileLoader){turnstileLoader=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';script.async=true;script.defer=true;script.onload=()=>window.turnstile?resolve(window.turnstile):reject(new Error('Human verification did not load.'));script.onerror=()=>reject(new Error('Could not load human verification. Check your connection and try again.'));document.head.append(script);}).catch(error=>{turnstileLoader=null;throw error;});}return turnstileLoader;}
+function showRegistrationResult(success,message){const dialog=$('#auth-result-dialog');if(!dialog){$('#form-message').innerHTML=notice(message,success?'success':'error');return;}dialog.dataset.state=success?'success':'error';$('[data-auth-dialog-icon]',dialog).textContent=success?'✓':'!';$('#auth-dialog-title',dialog).textContent=success?'Account created':'Account creation failed';$('[data-auth-dialog-message]',dialog).textContent=message;if(typeof dialog.showModal==='function')dialog.showModal();else $('#form-message').innerHTML=notice(message,success?'success':'error');}
+async function handleAuth(){const form=$('#auth-form');if(!form)return;const kind=form.dataset.authKind;const out=$('#form-message');const submitButton=$('button[type="submit"]',form);let captchaToken='';let widgetId;const dialog=$('#auth-result-dialog');if(dialog){$('[data-auth-dialog-close]',dialog).addEventListener('click',()=>dialog.close());dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close();});}if(kind==='register'){const help=$('#captcha-help');if(!cfg.CAPTCHA_SITE_KEY||cfg.CAPTCHA_SITE_KEY.includes('YOUR_CLOUDFLARE')){help.textContent='Registration is unavailable until Turnstile is configured.';}else{try{const turnstile=await loadTurnstile();widgetId=turnstile.render('#turnstile-container',{sitekey:cfg.CAPTCHA_SITE_KEY,callback:token=>{captchaToken=token;submitButton.disabled=false;help.textContent='Human verification complete.';},'expired-callback':()=>{captchaToken='';submitButton.disabled=true;help.textContent='Verification expired. Complete the check again.';},'error-callback':()=>{captchaToken='';submitButton.disabled=true;help.textContent='Verification failed to load. Refresh the page and try again.';}});}catch(error){help.textContent=error.message;}}}form.addEventListener('submit',async e=>{e.preventDefault();const data=new FormData(form);try{const client=await getSupabase();let res;if(kind==='login'){
+  res=await client.auth.signInWithPassword({
+    email:data.get('email'),
+    password:data.get('password')
+  });
+  if(res.error)throw res.error;
+  submitButton.disabled=true;
+  try{
+    const redirected=await redirectForVerifiedRole({signOutUnknown:true});
+    if(!redirected){
+      throw new Error('This account does not have an authorised member or administrator role. Contact support.');
+    }
+  }catch(routeError){
+    await client.auth.signOut();
+    throw routeError;
+  }
+  return;
+}if(kind==='register'){if(String(data.get('email')||'').trim().toLowerCase()!==String(data.get('email_confirm')||'').trim().toLowerCase())throw new Error('Email addresses do not match.');if(data.get('password')!==data.get('password_confirm'))throw new Error('Passwords do not match.');if(!captchaToken)throw new Error('Complete the human verification before creating your account.');submitButton.disabled=true;res=await client.auth.signUp({email:data.get('email'),password:data.get('password'),options:{data:{full_name:data.get('full_name'),tether_trc20_wallet:String(data.get('tether_trc20_wallet')||'').trim(),bitcoin_wallet:String(data.get('bitcoin_wallet')||'').trim(),usdc_wallet:String(data.get('usdc_wallet')||'').trim()},emailRedirectTo:location.origin+'/pages/login.html',captchaToken}});if(res.error)throw res.error;showRegistrationResult(true,'Your account has been created. If email confirmation is enabled, check your inbox to verify your address before signing in.');return;}res=await client.auth.resetPasswordForEmail(data.get('email'),{redirectTo:location.origin+'/pages/login.html'});if(res.error)throw res.error;out.innerHTML=notice('If the account exists, a password reset email has been requested.','success');}catch(err){if(kind==='register')showRegistrationResult(false,err.message||'We could not create your account. Please try again.');else out.innerHTML=notice(err.message||'Authentication failed.','error');if(kind==='register'&&widgetId!==undefined){captchaToken='';submitButton.disabled=true;window.turnstile?.reset(widgetId);$('#captcha-help').textContent='Please complete the human verification again.';}}finally{if(kind==='register'&&!dialog?.open&&widgetId!==undefined)submitButton.disabled=!captchaToken;}});}
+
+async function protect() {
+  const memberPages = [
+    'dashboard', 'new-deposit', 'deposit-history', 'investments',
+    'withdrawals', 'transactions', 'partner-program', 'profile'
+  ];
+  const isAdmin = page.startsWith('admin-');
+  const isMember = memberPages.includes(page);
+
+  if (!isAdmin && !isMember) return true;
+
+  if (!configured) {
+    app.innerHTML = `<section class="section"><div class="container">
+      ${notice('Configure Supabase in assets/js/config.js to use the portal.', 'error')}
+      <a class="btn btn-primary" href="../pages/login.html">Go to login</a>
+    </div></section>`;
+    return false;
+  }
+
+  try {
+    const activeSession = await session();
+
+    if (!activeSession) {
+      location.replace('../pages/login.html');
+      return false;
+    }
+
+    const me = await api('/api/me');
+    const role = me?.profile?.role;
+    const target = portalForRole(role);
+
+    if (!target) {
+      const client = await getSupabase();
+      await client.auth.signOut();
+      location.replace('../pages/login.html');
+      return false;
+    }
+
+    if (isAdmin && role !== 'admin') {
+      location.replace(target);
+      return false;
+    }
+
+    if (isMember && role !== 'member') {
+      location.replace(target);
+      return false;
+    }
+
+    if (isAdmin) await api('/api/admin/overview');
+    return true;
+  } catch (err) {
+    app.innerHTML = `<section class="section"><div class="container">
+      ${notice(err.message || 'Unable to load your account.', 'error')}
+    </div></section>`;
+    return false;
+  }
+}
+
+function sidebar(admin=false){const items=admin?[['Overview','index.html'],['Users','users.html'],['Deposits','deposits.html'],['Withdrawals','withdrawals.html'],['Plans','investments.html'],['Transactions','transactions.html'],['Partner program','partner-program.html'],['Audit log','audit-log.html'],['Settings','settings.html']]:[['Dashboard','dashboard.html'],['New deposit request','new-deposit.html'],['Deposit history','deposit-history.html'],['Investments','investments.html'],['Withdrawals','withdrawals.html'],['Transactions','transactions.html'],['Partner program','partner-program.html'],['My profile','profile.html']];return `<aside class="sidebar">${items.map(([n,p])=>`<a class="${location.pathname.endsWith(p)?'active':''}" href="${p}">${n}</a>`).join('')}</aside>`;}
+async function memberPage(){const admin=page.startsWith('admin-');const title=admin?({ 'admin-overview':'Admin overview','admin-users':'Users','admin-deposits':'Deposit reviews','admin-withdrawals':'Withdrawal reviews','admin-plans':'Plans & products','admin-transactions':'Transactions','admin-partners':'Partner program','admin-audit':'Audit log','admin-settings':'Settings'}[page]||'Administration'):({dashboard:'Dashboard','new-deposit':'New deposit request','deposit-history':'Deposit history',investments:'Investments',withdrawals:'Withdrawals',transactions:'Transactions','partner-program':'Partner program',profile:'My profile'}[page]||'Member area');app.innerHTML=`<section class="section ${page==='dashboard'?'member-dashboard-shell':admin?'admin-dashboard-shell':'member-page-shell'}"><div class="container"><p class="eyebrow">${admin?'ADMINISTRATION':'MEMBER AREA'}</p><h1>${title}</h1><div class="dashboard-layout">${sidebar(admin)}<div class="dashboard-main"><div class="loading">Loading your records…</div></div></div></div></section>`;const main=$('.dashboard-main');try{if(page==='dashboard'){
+const [d,me,requestData,contractData]=await Promise.all([
+  api('/api/dashboard'),
+  api('/api/me'),
+  api('/api/member/investment-requests'),
+  api('/api/member/contracts')
+]);
+const profile=me.profile||{};
+const balance=Number(d.wallet?.balance??0);
+const requests=requestData.items||[];
+const contracts=contractData.items||[];
+const totalReturn=contracts.reduce((sum,c)=>sum+Number(c.total_return||0),0);
+const contractValue=contracts.reduce((sum,c)=>sum+Number(c.current_value??c.principal??0),0);
+const pendingDeck=(d.deposits||[]).filter(x=>x.status==='pending').length+
+  (d.withdrawals||[]).filter(x=>x.status==='pending').length+
+  requests.filter(x=>x.status==='pending').length;
+const kycStatus=profile.kyc_status||'not_submitted';
+const kycLabel=kycStatus==='verified'?'Required files uploaded':kycStatus==='pending'?'Pending review':'Not completed';
+const displayName=(profile.display_name||profile.full_name||profile.email||'there').trim();
+const tickers=[['BTC','Illustrative'],['ETH','Illustrative'],['SOL','Illustrative'],['USDT','Illustrative']];
+const bars=[18,32,24,42,58,51,70,78,68,84,82,96];
+const statusText=v=>String(v||'pending').replace(/_/g,' ');
+main.innerHTML=`<div class="dashboard-summary">
+<div class="dashboard-topbar"><div><p class="eyebrow">PORTFOLIO</p><h2>Welcome back, ${esc(displayName)}</h2><p>Your account overview and investment activity.</p></div><span class="chip">${esc(kycLabel)}</span></div>
+<div class="ticker-strip">${tickers.map(([label,kind])=>`<div class="ticker-item"><span>${label}</span><strong>?</strong><em>${kind}</em></div>`).join('')}</div>
+<p class="notice">Market prices are not connected. Asset labels above are illustrative only.</p>
+<div class="stat-grid">
+<article class="card stat-card"><p>Available balance</p><strong>${money(balance,d.wallet?.asset||'USDT')}</strong><small>Current wallet ledger balance</small></article>
+<article class="card stat-card"><p>Recorded investment returns</p><strong>${money(totalReturn,'USDT')}</strong><small>Sum of returns entered in your investment records</small></article>
+<article class="card stat-card"><p>Pending reviews</p><strong>${pendingDeck+requests.filter(x=>x.status==='pending').length}</strong><small>Funding and investment requests</small></article>
+<article class="card stat-card"><p>Contract value</p><strong>${money(contractValue,'USDT')}</strong><small>Principal plus recorded returns</small></article>
+</div>
+<div class="dashboard-panels">
+<section class="panel canvas-panel"><div class="panel-header"><div><p class="eyebrow">PERFORMANCE</p><h3>Investment overview</h3></div></div>
+${contracts.length?`<div class="stat-grid"><article class="card stat-card"><p>Active contracts</p><strong>${contracts.filter(c=>c.status==='active').length}</strong></article><article class="card stat-card"><p>Total principal</p><strong>${money(contracts.reduce((sum,c)=>sum+Number(c.principal||0),0),'USDT')}</strong></article></div>`:'<div class="empty-state">No investment contracts yet. Submit a plan request to get started; an administrator must approve it before it becomes a contract.</div>'}
+</section>
+<aside class="panel"><div class="panel-header"><div><p class="eyebrow">VERIFICATION</p><h3>KYC status</h3></div></div>
+<div class="tier-box"><strong>${esc(kycLabel)}</strong><span>${kycStatus==='verified'?'Both required document categories are recorded. This does not independently verify document authenticity.':'Upload your identity and address documents to complete the file-upload workflow.'}</span></div>
+<a class="btn btn-outline" href="profile.html">Manage profile & documents</a></aside>
+</div>
+<div class="dashboard-panels">
+<section class="panel"><div class="panel-header"><div><p class="eyebrow">INVESTMENT REQUESTS</p><h3>Your plan requests</h3></div><a href="investments.html">View plans</a></div>
+${requests.length?`<ul class="activity-list">${requests.slice(0,4).map(item=>`<li><div><strong>${esc(item.plans?.name||'Investment plan')}</strong><span>${esc(statusText(item.status))}</span></div><small>${money(item.requested_amount,item.asset||'USDT')} ? ${esc(date(item.created_at))}</small></li>`).join('')}</ul>`:'<div class="empty-state">You have not submitted an investment plan request.</div>'}
+</section>
+<section class="panel"><div class="panel-header"><div><p class="eyebrow">CONTRACTS</p><h3>Approved investments</h3></div></div>
+${contracts.length?`<ul class="activity-list">${contracts.slice(0,4).map(c=>`<li><div><strong>${esc(c.plans?.name||'Investment contract')}</strong><span>${esc(statusText(c.status))}</span></div><small>Principal ${money(c.principal,c.asset||'USDT')} ? Returns ${money(c.total_return||0,c.asset||'USDT')}</small></li>`).join('')}</ul>`:'<div class="empty-state">Approved contracts will appear here.</div>'}
+</section>
+</div>
+<div class="dashboard-panels">
+<section class="panel"><div class="panel-header"><div><p class="eyebrow">DEPOSITS</p><h3>Recent funding</h3></div><a href="new-deposit.html">Review</a></div>
+${(d.deposits||[]).length?`<ul class="activity-list">${d.deposits.slice(0,3).map(item=>`<li><div><strong>${money(item.amount,item.asset||'USDT')}</strong><span>${esc(statusText(item.status))}</span></div><small>${esc(date(item.created_at))}</small></li>`).join('')}</ul>`:'<div class="empty-state">No recent deposits yet.</div>'}
+</section>
+<section class="panel"><div class="panel-header"><div><p class="eyebrow">WITHDRAWALS</p><h3>Request status</h3></div><a href="withdrawals.html">Open</a></div>
+${(d.withdrawals||[]).length?`<ul class="activity-list">${d.withdrawals.slice(0,3).map(item=>`<li><div><strong>${money(item.amount,item.asset||'USDT')}</strong><span>${esc(statusText(item.status))}</span></div><small>${esc(date(item.created_at))}</small></li>`).join('')}</ul>`:'<div class="empty-state">No recent withdrawals.</div>'}
+</section>
+</div>
+<div class="dashboard-panels"><section class="panel"><div class="panel-header"><div><p class="eyebrow">ACTIVITY</p><h3>Recent transactions</h3></div></div>
+<ul class="activity-list">${(d.transactions||[]).slice(0,5).map(item=>`<li><div><strong>${esc(item.kind||'transaction')}</strong><span>${esc(statusText(item.status))}</span></div><small>${money(item.amount,item.asset||'USDT')} ? ${esc(date(item.created_at))}</small></li>`).join('')||'<li><div><strong>No recent activity</strong></div></li>'}</ul>
+</section></div></div>`;
+}
+else if(page==='new-deposit'){
+const instructionsResult=await api('/api/payment-instructions');
+const methods=instructionsResult.items||[];
+const available=methods.filter(item=>item.enabled!==false);
+const crypto=available.find(item=>item.method==='crypto');
+const bank=available.find(item=>item.method==='bank');
+main.innerHTML=`<div class="notice">Use only the payment instructions shown here. A request is not proof of payment; funds are credited only after manual reconciliation. The member ledger currently supports USDT only. Card payments are not enabled because no processor has been selected.</div>${!available.length?'<div class="empty-state" style="margin-top:20px">Deposit instructions are not available yet. Contact support.</div>':`<div class="payment-layout"><div class="payment-instructions">${available.map(item=>item.method==='crypto'?`<article class="instruction-card"><p class="eyebrow">CRYPTO TRANSFER · ${esc(item.network)}</p><h2>Send USDT</h2><p>Only send USDT using the exact network shown. Transfers on the wrong network may be unrecoverable.</p><div class="copy-field"><code>${esc(item.wallet_address)}</code><button class="btn btn-outline small-btn" type="button" data-copy="${esc(item.wallet_address)}">Copy</button></div>${item.instructions?`<p>${esc(item.instructions)}</p>`:''}</article>`:`<article class="instruction-card"><p class="eyebrow">BANK TRANSFER · ${esc(item.currency)}</p><h2>Transfer to our account</h2><dl class="instruction-list"><dt>Bank</dt><dd>${esc(item.bank_name)}</dd><dt>Account name</dt><dd>${esc(item.account_name)}</dd><dt>Account number</dt><dd>${esc(item.account_number)}</dd>${item.iban?`<dt>IBAN</dt><dd>${esc(item.iban)}</dd>`:''}${item.swift_bic?`<dt>SWIFT / BIC</dt><dd>${esc(item.swift_bic)}</dd>`:''}</dl>${item.instructions?`<p>${esc(item.instructions)}</p>`:''}</article>`).join('')}</div><form id="deposit-form" class="form-card form-grid payment-request"><p class="eyebrow">NEW DEPOSIT REQUEST</p><h2>Tell us about your transfer</h2><div class="field"><label for="deposit-method">Payment method</label><select name="payment_method" id="deposit-method" required>${crypto?'<option value="crypto">USDT transfer</option>':''}${bank?`<option value="bank">Bank transfer (${esc(bank.currency)})</option>`:''}</select></div><div class="field"><label for="deposit-amount" id="deposit-amount-label">USDT amount sent</label><input id="deposit-amount" name="amount" type="number" min="0.00000001" max="1000000" step="0.00000001" required></div><div class="field hidden" id="bank-amount-field"><label for="bank-payment-amount">Amount sent (${esc(bank?.currency||'currency')})</label><input id="bank-payment-amount" name="payment_amount" type="number" min="0.00000001" max="1000000" step="0.00000001"></div><input name="payment_currency" id="payment-currency" type="hidden" value="${esc(crypto?'USDT':bank?.currency||'')}"><div class="field"><label for="deposit-reference">Transfer reference or transaction ID</label><input id="deposit-reference" name="reference" maxlength="180"></div><button class="btn btn-primary" type="submit">Submit for verification</button><div id="form-message" aria-live="polite"></div></form></div>`}`
+$('#deposit-method')?.addEventListener('change',e=>{const isBank=e.currentTarget.value==='bank';$('#bank-amount-field').classList.toggle('hidden',!isBank);$('#bank-payment-amount').required=isBank;$('#deposit-amount-label').textContent=isBank?'Requested USDT credit (admin-confirmed)':'USDT amount sent';$('#payment-currency').value=isBank?(bank?.currency||''):'USDT';});
+$('#deposit-method')?.dispatchEvent(new Event('change'));
+main.querySelectorAll('[data-copy]').forEach(button=>button.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(button.dataset.copy);button.textContent='Copied';setTimeout(()=>button.textContent='Copy',1500);}catch{$('#form-message').innerHTML=notice('Could not access clipboard. Select and copy the address manually.','error');}}));
+$('#deposit-form')?.addEventListener('reset',()=>setTimeout(()=>$('#deposit-method')?.dispatchEvent(new Event('change')),0));
+$('#deposit-form')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const method=f.get('payment_method');try{const r=await api('/api/deposits',{method:'POST',body:JSON.stringify({amount:Number(f.get('amount')),asset:'USDT',payment_method:method,payment_amount:method==='bank'?Number(f.get('payment_amount')):null,payment_currency:method==='bank'?f.get('payment_currency'):'USDT',reference:f.get('reference')||null})});$('#form-message').innerHTML=notice(r.message,'success');e.currentTarget.reset();}catch(err){$('#form-message').innerHTML=notice(err.message,'error');}});
+}
+else if(page==='deposit-history'){const d=await api('/api/deposits');main.innerHTML=table(['ID','Method','Payment reported','USDT requested','USDT credited','Status','Submitted'],d.items.map(item=>`<tr><td>${esc(item.id)}</td><td>${esc(item.payment_method||'crypto')}</td><td>${item.payment_amount?money(item.payment_amount,item.payment_currency||item.asset):'—'}</td><td>${money(item.amount,item.asset)}</td><td>${item.credited_amount?money(item.credited_amount,'USDT'):'Pending review'}</td><td>${status(item.status)}</td><td>${esc(date(item.created_at))}</td></tr>`));}
+else if(page==='withdrawals'){const d=await api('/api/withdrawals');main.innerHTML=`<form id="withdraw-form" class="form-card form-grid"><h2>Request a withdrawal</h2><div class="notice">Only USDT is supported by this starter wallet. Submitting reserves the requested balance. Approval does not itself transfer funds.</div><div class="field"><label>Amount (USDT)</label><input name="amount" type="number" min="0.0001" step="0.0001" required></div><input name="asset" type="hidden" value="USDT"><div class="field"><label>Network</label><select name="network"><option>TRC20</option><option>ERC20</option><option>Ethereum</option></select></div><div class="field"><label>Destination wallet address</label><input name="wallet_address" minlength="8" maxlength="220" required></div><button class="btn btn-primary">Submit withdrawal request</button><div id="form-message" aria-live="polite"></div></form><h2 style="margin-top:32px">Your requests</h2>${rows(d.items,[['id','Reference'],['amount','Amount'],['asset','Asset'],['status','Status'],['created_at','Submitted']])}`;$('#withdraw-form').addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.currentTarget);try{const r=await api('/api/withdrawals',{method:'POST',body:JSON.stringify({amount:Number(f.get('amount')),asset:f.get('asset'),network:f.get('network'),wallet_address:f.get('wallet_address')})});$('#form-message').innerHTML=notice(r.message,'success');}catch(err){$('#form-message').innerHTML=notice(err.message,'error');}});}
+else if(page==='transactions'){const d=await api('/api/transactions');main.innerHTML=rows(d.items,[['kind','Type'],['amount','Amount'],['asset','Asset'],['status','Status'],['reference','Reference'],['created_at','Date']]);}
+else if(page==='investments'){
+  main.innerHTML='<div class="notice">Loading investment plans and your requests?</div>';
+  try{
+    const [plansData,requestsData,contractsData]=await Promise.all([
+      api('/api/plans'),
+      api('/api/member/investment-requests'),
+      api('/api/member/contracts')
+    ]);
+    const plans=plansData.items||[];
+    const requests=requestsData.items||[];
+    const contracts=contractsData.items||[];
+
+    const planCards=plans.length?plans.map(p=>`
+      <article class="card investment-plan">
+        <p class="eyebrow">INVESTMENT PLAN</p>
+        <h3>${esc(p.name||'Investment plan')}</h3>
+        <p>${esc(p.description||'Review the plan details before submitting a request.')}</p>
+        <div class="investment-plan-meta">
+          <span>Minimum</span><strong>${money(Number(p.minimum_amount||0),'USDT')}</strong>
+          <span>Maximum</span><strong>${money(Number(p.maximum_amount||0),'USDT')}</strong>
+          <span>Duration</span><strong>${p.contract_duration_days?`${Number(p.contract_duration_days)} days`:'Not specified'}</strong>
+        </div>
+        ${p.terms?`<p class="muted">${esc(p.terms)}</p>`:''}
+        <form class="investment-request-form form-grid" data-plan-id="${esc(p.id)}">
+          <div class="field">
+            <label>Amount (USDT)</label>
+            <input name="amount" type="number" min="${Number(p.minimum_amount||0)}" max="${Number(p.maximum_amount||0)}" step="0.01" required>
+          </div>
+          <div class="field">
+            <label>Note (optional)</label>
+            <input name="member_note" maxlength="500" placeholder="Anything the reviewer should know">
+          </div>
+          <button class="btn btn-primary" type="submit">Request this plan</button>
+          <div class="form-message" aria-live="polite"></div>
+        </form>
+      </article>
+    `).join(''):'<div class="notice">There are no active plans available right now.</div>';
+
+    const requestRows=requests.length?requests.map(r=>`
+      <tr>
+        <td>${esc(r.plan_name||r.plan?.name||'Investment plan')}</td>
+        <td>${money(Number(r.amount||0),'USDT')}</td>
+        <td>${status(r.status||'pending')}</td>
+        <td>${esc(r.member_note||'?')}</td>
+        <td>${date(r.created_at)}</td>
+        <td>${esc(r.admin_note||'?')}</td>
+      </tr>
+    `).join(''):'<tr><td colspan="6">You have not submitted any plan requests yet.</td></tr>';
+
+    const contractCards=contracts.length?contracts.map(c=>{
+      const principal=Number(c.principal_amount??c.principal??0);
+      const returns=Number(c.total_return??c.return_amount??0);
+      const currentValue=Number(c.current_value??(principal+returns));
+      return `<article class="card">
+        <div class="dashboard-topbar">
+          <div><p class="eyebrow">CONTRACT</p><h3>${esc(c.plan_name||c.plan?.name||'Investment contract')}</h3></div>
+          ${status(c.status||'active')}
+        </div>
+        <div class="investment-plan-meta">
+          <span>Principal</span><strong>${money(principal,'USDT')}</strong>
+          <span>Recorded returns</span><strong>${money(returns,'USDT')}</strong>
+          <span>Current value</span><strong>${money(currentValue,'USDT')}</strong>
+          <span>Start date</span><strong>${date(c.start_date||c.created_at)}</strong>
+          <span>End date</span><strong>${c.end_date?date(c.end_date):'Not specified'}</strong>
+        </div>
+      </article>`;
+    }).join(''):'<div class="notice">No active contracts yet. A request must be approved by an administrator before a contract is created.</div>';
+
+    main.innerHTML=`
+      <section>
+        <p class="eyebrow">PLANS & REQUESTS</p>
+        <h2>Explore investment plans</h2>
+        <p class="muted">Submit a request for review. Submitting a request does not activate a contract or guarantee returns.</p>
+        <div class="investment-plan-grid">${planCards}</div>
+      </section>
+      <section style="margin-top:36px">
+        <p class="eyebrow">YOUR ACTIVITY</p><h2>Plan requests</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Plan</th><th>Amount</th><th>Status</th><th>Your note</th><th>Submitted</th><th>Admin note</th></tr></thead>
+          <tbody>${requestRows}</tbody>
+        </table></div>
+      </section>
+      <section style="margin-top:36px">
+        <p class="eyebrow">APPROVED PLANS</p><h2>Your contracts</h2>
+        <div class="investment-contract-grid">${contractCards}</div>
+      </section>`;
+
+    $$('.investment-request-form').forEach(form=>{
+      form.addEventListener('submit',async e=>{
+        e.preventDefault();
+        const button=form.querySelector('button[type="submit"]');
+        const message=form.querySelector('.form-message');
+        const data=new FormData(form);
+        const amount=Number(data.get('amount'));
+        const plan=plans.find(p=>String(p.id)===String(form.dataset.planId));
+        if(!plan||!Number.isFinite(amount)||amount<Number(plan.minimum_amount)||amount>Number(plan.maximum_amount)){
+          message.innerHTML=notice('Enter an amount within this plan?s minimum and maximum.','error');
+          return;
+        }
+        button.disabled=true;
+        try{
+          const result=await api('/api/member/investment-requests',{
+            method:'POST',
+            body:JSON.stringify({
+              plan_id:form.dataset.planId,
+              amount,
+              member_note:String(data.get('member_note')||'').trim()
+            })
+          });
+          message.innerHTML=notice(result.message||'Your request has been submitted for admin review.','success');
+          form.reset();
+          setTimeout(()=>memberPage('investments'),500);
+        }catch(err){
+          message.innerHTML=notice(err.message||'Could not submit your request.','error');
+          button.disabled=false;
+        }
+      });
+    });
+  }catch(err){
+    main.innerHTML=`<div class="notice">${esc(err.message||'Could not load investment information. Please try again.')}</div>`;
+  }
+}else if(page==='partner-program'){main.innerHTML=`<div class="empty-state"><h2>Partner program not configured</h2><p>Referral tracking, attribution and payouts require an approved program design and backend rules.</p></div>`;}
+else if(page==='profile'){const d=await api('/api/me');main.innerHTML=`<form id="profile-form" class="form-card form-grid"><div class="field"><label>Email</label><input value="${esc(d.profile.email||'')}" disabled></div><div class="field"><label>Full name</label><input name="full_name" maxlength="120" value="${esc(d.profile.full_name||'')}"></div><div class="field"><label>Phone</label><input name="phone" maxlength="40" value="${esc(d.profile.phone||'')}"></div><button class="btn btn-primary">Save profile</button><div id="form-message" aria-live="polite"></div></form>`;$('#profile-form').addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.currentTarget);try{await api('/api/me',{method:'PATCH',body:JSON.stringify({full_name:f.get('full_name'),phone:f.get('phone')})});$('#form-message').innerHTML=notice('Profile updated.','success');}catch(err){$('#form-message').innerHTML=notice(err.message,'error');}});}
+else if(page==='admin-overview'){const d=await api('/api/admin/overview');main.innerHTML=`<div class="grid grid-3"><article class="card stat-card"><p>Registered users</p><strong>${d.users}</strong></article><article class="card stat-card"><p>Pending deposits</p><strong>${d.pending_deposits}</strong><a href="deposits.html">Reconcile requests</a></article><article class="card stat-card"><p>Pending withdrawals</p><strong>${d.pending_withdrawals}</strong><a href="withdrawals.html">Review requests</a></article><article class="card stat-card"><p>Approved withdrawals awaiting transfer</p><strong>${d.approved_withdrawals}</strong><a href="withdrawals.html">Record transfers</a></article></div><div class="notice" style="margin-top:20px">Manually verify incoming bank receipts and blockchain transactions before approving deposits. Withdrawal approval is not a transfer; record a transfer reference only after funds are sent.</div>`;}
+else if(page==='admin-users'){const d=await api('/api/admin/users');main.innerHTML=`<div class="notice">Set a member's available USDT balance. Each change records the previous and new balance, signed adjustment, admin, and reason in the transaction ledger and audit log. Withdrawal decisions remain forward-only: pending requests can be approved or rejected; approved requests can be marked completed after transfer.</div><div class="table-wrap" style="margin-top:20px"><table><thead><tr><th>User</th><th>Role</th><th>Current balance</th><th>Set balance (USDT)</th><th>Reason (required)</th><th>Action</th></tr></thead><tbody>${d.items.map(user=>{const wallet=Array.isArray(user.wallets)?user.wallets[0]:user.wallets;const balance=wallet?.balance??0;const asset=wallet?.asset||'USDT';return `<tr><td>${esc(user.email||user.id)}<br><small>${esc(user.full_name||'')}</small></td><td>${esc(user.role)}</td><td><span data-current-balance="${esc(user.id)}">${money(balance,asset)}</span></td><td colspan="3"><form class="actions balance-edit-form" data-user-id="${esc(user.id)}"><input aria-label="New balance for ${esc(user.email||user.id)}" name="balance" type="number" min="0" max="999999999999.99999999" step="0.00000001" value="${esc(balance)}" required><input aria-label="Reason for balance change" name="reason" type="text" maxlength="500" minlength="3" placeholder="Reason for adjustment" required><button class="btn btn-outline small-btn" type="submit">Set balance</button><span id="balance-message-${esc(user.id)}" aria-live="polite"></span></form></td></tr>`;}).join('')}</tbody></table></div>`;main.querySelectorAll('.balance-edit-form').forEach(form=>form.addEventListener('submit',async event=>{event.preventDefault();const fields=new FormData(form);const userId=form.dataset.userId;const message=$(`#balance-message-${CSS.escape(userId)}`);const button=$('button[type="submit"]',form);button.disabled=true;try{const result=await api(`/api/admin/users/${encodeURIComponent(userId)}/balance`,{method:'PUT',body:JSON.stringify({balance:fields.get('balance'),reason:fields.get('reason')})});const item=result.item;const current=$(`[data-current-balance="${CSS.escape(userId)}"]`);if(current&&item)current.textContent=money(item.balance,item.asset||'USDT');message.innerHTML=notice(result.message,'success');}catch(error){message.innerHTML=notice(error.message||'Balance could not be updated.','error');}finally{button.disabled=false;}}));}
+else if(page==='admin-deposits'){
+const d=await api('/api/admin/deposits');
+main.innerHTML=table(['User','Payment method','Payment reported','USDT requested','Status','Review'],d.items.map(x=>`<tr><td>${esc(x.profiles?.email||x.user_id)}</td><td>${esc(x.payment_method||'crypto')} · ${esc(x.network)}</td><td>${x.payment_amount?money(x.payment_amount,x.payment_currency||x.asset):'—'}<br><small>${esc(x.reference||'No reference supplied')}</small></td><td>${money(x.amount,'USDT')}</td><td>${status(x.status)}${x.credited_amount?`<br><small>Credited ${money(x.credited_amount,'USDT')}</small>`:''}</td><td>${x.status==='pending'?`<div class="actions"><button class="btn btn-primary small-btn" data-review="approved" data-id="${esc(x.id)}" data-method="${esc(x.payment_method||'crypto')}" data-amount="${esc(x.amount)}">Approve after reconciliation</button><button class="btn btn-outline small-btn" data-review="rejected" data-id="${esc(x.id)}" data-method="${esc(x.payment_method||'crypto')}">Reject</button></div>`:'—'}</td></tr>`));
+main.querySelectorAll('[data-review]').forEach(button=>button.addEventListener('click',async()=>{
+const isBank=button.dataset.method==='bank';
+const credited=isBank&&button.dataset.review==='approved'?prompt('Enter the verified USDT amount to credit. Confirm bank receipt and conversion first:'):null;
+if(isBank&&button.dataset.review==='approved'&&credited===null)return;
+if(isBank&&button.dataset.review==='approved'&&(!Number.isFinite(Number(credited))||Number(credited)<=0)){alert('Enter a valid USDT credit amount.');return;}
+const note=prompt('Reconciliation note (optional):');
+if(note===null)return;
+try{await api(`/api/admin/deposits/${button.dataset.id}`,{method:'PATCH',body:JSON.stringify({status:button.dataset.review,note:note||null,credited_amount:button.dataset.review==='approved'?(isBank?Number(credited):Number(button.dataset.amount)):null})});await memberPage();}catch(error){alert(error.message);}
+}));
+}
+else if(page==='admin-withdrawals'){
+const d=await api('/api/admin/withdrawals');
+main.innerHTML=table(['User','Amount','Network','Wallet','Status','Review / transfer'],d.items.map(x=>`<tr><td>${esc(x.profiles?.email||x.user_id)}</td><td>${money(x.amount,x.asset)}</td><td>${esc(x.network)}</td><td><code>${esc(x.wallet_address)}</code></td><td>${status(x.status)}</td><td>${x.status==='pending'?`<div class="actions"><button class="btn btn-primary small-btn" data-review="approved" data-id="${esc(x.id)}">Approve</button><button class="btn btn-outline small-btn" data-review="rejected" data-id="${esc(x.id)}">Reject / refund</button></div>`:x.status==='approved'?`<button class="btn btn-primary small-btn" data-review="completed" data-id="${esc(x.id)}">Mark transferred</button>`:esc(x.review_note||'—')}</td></tr>`));
+main.querySelectorAll('[data-review]').forEach(button=>button.addEventListener('click',async()=>{
+const action=button.dataset.review;
+const promptText=action==='completed'?'Confirm the USDT transfer is complete. Enter the transfer reference:':'Review note (optional):';
+const note=prompt(promptText);
+if(note===null)return;
+if(action==='completed'&&!note.trim()){alert('A transfer reference is required to mark this withdrawal complete.');return;}
+try{await api(`/api/admin/withdrawals/${button.dataset.id}`,{method:'PATCH',body:JSON.stringify({status:action,note:note||null})});await memberPage();}catch(error){alert(error.message);}
+}));
+}
+else if(page==='admin-transactions'){const d=await api('/api/admin/transactions');main.innerHTML=rows(d.items,[['kind','Type'],['amount','Amount'],['asset','Asset'],['status','Status'],['reference','Reference'],['created_at','Date']]);}
+else if(page==='admin-audit'){const d=await api('/api/admin/audit-log');main.innerHTML=rows(d.items,[['action','Action'],['entity_type','Entity'],['entity_id','Entity ID'],['actor_id','Actor'],['created_at','Date']]);}
+else if(page==='admin-plans'){const d=await api('/api/admin/plans');main.innerHTML=`<form id="plan-form" class="form-card form-grid"><h2>Create a service category</h2><div class="field"><label>Name</label><input name="name" required maxlength="100"></div><div class="field"><label>Description</label><textarea name="description" maxlength="1000"></textarea></div><div class="field"><label>Minimum amount</label><input name="minimum_amount" type="number" min="0.01" step="0.01" required></div><div class="field"><label>Maximum amount (optional)</label><input name="maximum_amount" type="number" min="0.01" step="0.01"></div><button class="btn btn-primary">Create category</button><div id="form-message" aria-live="polite"></div></form><h2 style="margin-top:32px">Existing categories</h2>${rows(d.items,[['name','Name'],['minimum_amount','Minimum'],['maximum_amount','Maximum'],['active','Active'],['created_at','Created']])}`;$('#plan-form').addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const minimum=Number(f.get('minimum_amount'));const maximum=f.get('maximum_amount')?Number(f.get('maximum_amount')):null;if(maximum!==null&&maximum<minimum){$('#form-message').innerHTML=notice('Maximum amount must be greater than or equal to minimum amount.','error');return;}try{await api('/api/admin/plans',{method:'POST',body:JSON.stringify({name:f.get('name'),description:f.get('description'),minimum_amount:minimum,maximum_amount:maximum,active:true})});$('#form-message').innerHTML=notice('Category created. Refresh to view it.','success');}catch(err){$('#form-message').innerHTML=notice(err.message,'error');}});}
+else if(page==='admin-settings'){
+const d=await api('/api/admin/payment-instructions');
+const crypto=d.items.find(item=>item.method==='crypto')||{};
+const bank=d.items.find(item=>item.method==='bank')||{};
+main.innerHTML=`<p class="muted">Payment destinations are visible to signed-in members only when enabled. Verify bank receipts and blockchain transactions independently before approving deposits. Card payments are disabled until a processor is configured.</p><div class="settings-grid"><form id="crypto-instructions-form" class="form-card form-grid settings-card"><p class="eyebrow">USDT · CRYPTO</p><h2>Crypto transfer instructions</h2><label class="toggle-row"><input type="checkbox" name="enabled" ${crypto.enabled?'checked':''}> Show to members</label><div class="field"><label>Network</label><input name="network" maxlength="40" value="${esc(crypto.network||'')}" placeholder="For example, TRC20"></div><div class="field"><label>USDT wallet address</label><input name="wallet_address" maxlength="220" value="${esc(crypto.wallet_address||'')}" placeholder="Public receiving address"></div><div class="field"><label>Additional instructions</label><textarea name="instructions" maxlength="1000">${esc(crypto.instructions||'')}</textarea></div><button class="btn btn-primary">Save crypto instructions</button><div id="crypto-message" aria-live="polite"></div></form><form id="bank-instructions-form" class="form-card form-grid settings-card"><p class="eyebrow">BANK TRANSFER</p><h2>Bank transfer instructions</h2><label class="toggle-row"><input type="checkbox" name="enabled" ${bank.enabled?'checked':''}> Show to members</label><div class="field"><label>Bank name</label><input name="bank_name" maxlength="120" value="${esc(bank.bank_name||'')}"></div><div class="field"><label>Account holder</label><input name="account_name" maxlength="120" value="${esc(bank.account_name||'')}"></div><div class="field"><label>Account number</label><input name="account_number" maxlength="80" value="${esc(bank.account_number||'')}"></div><div class="field"><label>Accepted currency code (ISO 4217)</label><input name="currency" maxlength="3" pattern="[A-Za-z]{3}" value="${esc(bank.currency||'')}" placeholder="USD"></div><div class="field"><label>IBAN (optional)</label><input name="iban" maxlength="80" value="${esc(bank.iban||'')}"></div><div class="field"><label>SWIFT / BIC (optional)</label><input name="swift_bic" maxlength="20" value="${esc(bank.swift_bic||'')}"></div><div class="field"><label>Additional instructions</label><textarea name="instructions" maxlength="1000">${esc(bank.instructions||'')}</textarea></div><button class="btn btn-primary">Save bank instructions</button><div id="bank-message" aria-live="polite"></div></form></div><div class="notice" style="margin-top:24px">Do not put card processor secrets, private keys or confidential credentials in these fields. These forms store payment destination details in the project database.</div>`;
+$('#crypto-instructions-form').addEventListener('submit',async event=>{event.preventDefault();const form=new FormData(event.currentTarget);try{await api('/api/admin/payment-instructions/crypto',{method:'PUT',body:JSON.stringify({enabled:form.has('enabled'),network:form.get('network'),wallet_address:form.get('wallet_address'),instructions:form.get('instructions')})});$('#crypto-message').innerHTML=notice('Crypto payment instructions saved.','success');}catch(error){$('#crypto-message').innerHTML=notice(error.message,'error');}});
+$('#bank-instructions-form').addEventListener('submit',async event=>{event.preventDefault();const form=new FormData(event.currentTarget);try{await api('/api/admin/payment-instructions/bank',{method:'PUT',body:JSON.stringify({enabled:form.has('enabled'),bank_name:form.get('bank_name'),account_name:form.get('account_name'),account_number:form.get('account_number'),currency:form.get('currency'),iban:form.get('iban'),swift_bic:form.get('swift_bic'),instructions:form.get('instructions')})});$('#bank-message').innerHTML=notice('Bank transfer instructions saved.','success');}catch(error){$('#bank-message').innerHTML=notice(error.message,'error');}});
+}
+else if(page==='admin-partners'){main.innerHTML=`<div class="empty-state"><h2>Configuration required</h2><p>This module is intentionally not active until its policy and operational requirements are defined.</p></div>`;}
+}catch(err){main.innerHTML=notice(err.message||'Unable to load records.','error');}}
+function bindPublic(){document.querySelectorAll('.faq-question').forEach(b=>b.addEventListener('click',()=>{const item=b.closest('.faq-item');const open=item.classList.toggle('open');b.setAttribute('aria-expanded',String(open));b.querySelector('span').textContent=open?'−':'＋';}));const f=$('#contact-form');f?.addEventListener('submit',e=>{e.preventDefault();$('#form-message').innerHTML=notice('Form fields validated. No message has been sent; configure a support endpoint before launch.','success');});}
+async function init(){
+  nav();
+  footer();
+
+  if (page === 'login') {
+    try {
+      if (await redirectForVerifiedRole({signOutUnknown:true})) return;
+    } catch (error) {
+      app.innerHTML = `<section class="section"><div class="container">
+        ${notice(error.message || 'Unable to verify your account. Please try again.', 'error')}
+        <a class="btn btn-outline" href="../pages/login.html">Continue to login</a>
+      </div></section>`;
+      return;
+    }
+  }
+
+  if (publicContent[page]) {
+    app.innerHTML = publicContent[page]();
+    bindPublic();
+    if (page === 'plans') renderPlans();
+    if (['login', 'register', 'forgot-password'].includes(page)) handleAuth();
+    return;
+  }
+
+  if (page === 'home') {
+    app.innerHTML = home();
+    bindPublic();
+    const principles = [...app.querySelectorAll('.section')]
+      .find(section => section.querySelector('.eyebrow')?.textContent === 'OUR PRINCIPLES');
+    principles?.classList.add('home-principles');
+    setupHeroCarousel();
+    return;
+  }
+
+  if (await protect()) await memberPage();
+}
+init();

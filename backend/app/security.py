@@ -19,8 +19,56 @@ def current_user(credentials: HTTPAuthorizationCredentials | None = Depends(bear
     except Exception:
         raise HTTPException(status_code=401, detail="Your session is invalid or expired")
 
+
+def member_user(user: dict = Depends(current_user)) -> dict:
+    try:
+        result = (
+            admin_db.table("profiles")
+            .select("id,role")
+            .eq("id", user["id"])
+            .maybe_single()
+            .execute()
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail="Could not verify account permissions.",
+        )
+
+    if not result.data:
+        raise HTTPException(
+            status_code=403,
+            detail="Member account required.",
+        )
+
+    if result.data.get("role") != "member":
+        raise HTTPException(
+            status_code=403,
+            detail="Member account required.",
+        )
+
+    return {**user, "profile": result.data}
+
+
 def admin_user(user: dict = Depends(current_user)) -> dict:
-    result = admin_db.table("profiles").select("id,role,full_name,email").eq("id", user["id"]).maybe_single().execute()
+    try:
+        result = (
+            admin_db.table("profiles")
+            .select("id,role,full_name,email")
+            .eq("id", user["id"])
+            .maybe_single()
+            .execute()
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail="Could not verify administrator permissions.",
+        )
+
     if not result.data or result.data.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Administrator access required")
+        raise HTTPException(
+            status_code=403,
+            detail="Administrator access required",
+        )
+
     return {**user, "profile": result.data}

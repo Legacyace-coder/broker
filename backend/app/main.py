@@ -4,8 +4,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from postgrest.exceptions import APIError
 from supabase import Client
 from decimal import Decimal
+from .member_features import router as member_features_router
 from .config import settings
-from .security import admin_db, current_user, admin_user
+from .security import admin_db, current_user, member_user, admin_user
 from .schemas import (
     BankInstructionsUpdate,
     BalanceSetRequest,
@@ -23,34 +24,42 @@ app = FastAPI(title="Northstar Capital API", version="1.0.0")
 logger = logging.getLogger(__name__)
 origins = [x.strip() for x in settings.cors_origins.split(",") if x.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=False, allow_methods=["GET", "POST", "PUT", "PATCH", "OPTIONS"], allow_headers=["Authorization", "Content-Type"])
+app.include_router(member_features_router)
 
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "northstar-capital-api"}
 
 @app.get("/api/me")
-def me(user: dict = Depends(current_user)):
-    result = admin_db.table("profiles").select("id,email,full_name,phone,role,created_at").eq("id", user["id"]).maybe_single().execute()
+def me(user: dict = Depends(member_user)):
+    result = admin_db.table("profiles").select("id,email,full_name,display_name,phone,role,kyc_status,kyc_uploaded_at,profile_image_path,created_at").eq("id", user["id"]).maybe_single().execute()
     wallet = admin_db.table("wallets").select("balance,asset,updated_at").eq("user_id", user["id"]).maybe_single().execute()
     return {"profile": result.data or {"id": user["id"], "email": user.get("email")}, "wallet": wallet.data or {"balance": 0, "asset": "USDT"}}
 
 @app.patch("/api/me")
-def update_me(payload: dict, user: dict = Depends(current_user)):
-    allowed = {k: payload[k] for k in ("full_name", "phone") if k in payload}
+def update_me(payload: dict, user: dict = Depends(member_user)):
+    allowed = {k: payload[k] for k in ("full_name", "display_name", "phone") if k in payload}
     if "full_name" in allowed and (not isinstance(allowed["full_name"], str) or len(allowed["full_name"].strip()) > 120):
         raise HTTPException(422, "Invalid full name")
     if "phone" in allowed and (not isinstance(allowed["phone"], str) or len(allowed["phone"]) > 40):
         raise HTTPException(422, "Invalid phone")
-    result = admin_db.table("profiles").update(allowed).eq("id", user["id"]).select("id,email,full_name,phone,role,created_at").execute()
+    if "display_name" in allowed and (
+        not isinstance(allowed["display_name"], str)
+        or len(allowed["display_name"].strip()) > 80
+    ):
+        raise HTTPException(422, "Invalid display name")
+    if "display_name" in allowed:
+        allowed["display_name"] = allowed["display_name"].strip()
+    result = admin_db.table("profiles").update(allowed).eq("id", user["id"]).select("id,email,full_name,display_name,phone,role,kyc_status,kyc_uploaded_at,profile_image_path,created_at").execute()
     return {"profile": result.data[0] if result.data else None}
 
 @app.get("/api/plans")
 def plans():
-    result = admin_db.table("plans").select("id,name,description,minimum_amount,maximum_amount,active,created_at").eq("active", True).order("minimum_amount").execute()
+    result = admin_db.table("plans").select("id,name,description,minimum_amount,maximum_amount,contract_duration_days,terms,active,created_at").eq("active", True).order("minimum_amount").execute()
     return {"items": result.data or []}
 
 @app.get("/api/dashboard")
-def dashboard(user: dict = Depends(current_user)):
+def dashboard(user: dict = Depends(member_user)):
     wallet = admin_db.table("wallets").select("balance,asset,updated_at").eq("user_id", user["id"]).maybe_single().execute()
     deposits = admin_db.table("deposits").select("id,amount,asset,status,created_at").eq("user_id", user["id"]).order("created_at", desc=True).limit(5).execute()
     withdrawals = admin_db.table("withdrawals").select("id,amount,asset,status,created_at").eq("user_id", user["id"]).order("created_at", desc=True).limit(5).execute()
@@ -58,13 +67,13 @@ def dashboard(user: dict = Depends(current_user)):
     return {"wallet": wallet.data or {"balance": 0, "asset": "USDT"}, "deposits": deposits.data or [], "withdrawals": withdrawals.data or [], "transactions": txs.data or []}
 
 @app.get("/api/payment-instructions")
-def payment_instructions(_: dict = Depends(current_user)):
+def payment_instructions(_: dict = Depends(member_user)):
     fields = "method,network,wallet_address,instructions,bank_name,account_name,account_number,iban,swift_bic,currency"
     result = admin_db.table("payment_instructions").select(fields).eq("enabled", True).order("method").execute()
     return {"items": result.data or []}
 
 @app.post("/api/deposits", status_code=201)
-def create_deposit(payload: DepositRequest, user: dict = Depends(current_user)):
+def create_deposit(payload: DepositRequest, user: dict = Depends(member_user)):
     if payload.asset.upper() != "USDT":
         raise HTTPException(422, "Only USDT deposits are supported")
     configured = admin_db.table("payment_instructions").select("method,network,currency").eq("method", payload.payment_method).eq("enabled", True).maybe_single().execute()
@@ -95,12 +104,12 @@ def create_deposit(payload: DepositRequest, user: dict = Depends(current_user)):
     return {"message": "Deposit request recorded. No funds are credited until an administrator verifies the payment.", "item": result.data[0]}
 
 @app.get("/api/deposits")
-def list_deposits(user: dict = Depends(current_user)):
+def list_deposits(user: dict = Depends(member_user)):
     result = admin_db.table("deposits").select("id,amount,asset,network,payment_method,payment_amount,payment_currency,credited_amount,reference,status,review_note,created_at,reviewed_at").eq("user_id", user["id"]).order("created_at", desc=True).execute()
     return {"items": result.data or []}
 
 @app.post("/api/withdrawals", status_code=201)
-def create_withdrawal(payload: WithdrawalRequest, user: dict = Depends(current_user)):
+def create_withdrawal(payload: WithdrawalRequest, user: dict = Depends(member_user)):
     if payload.asset.upper() != "USDT":
         raise HTTPException(422, "Only USDT withdrawals are supported")
     try:
@@ -113,12 +122,12 @@ def create_withdrawal(payload: WithdrawalRequest, user: dict = Depends(current_u
         raise HTTPException(400, "Could not submit withdrawal request. Check your balance and details.")
 
 @app.get("/api/withdrawals")
-def list_withdrawals(user: dict = Depends(current_user)):
+def list_withdrawals(user: dict = Depends(member_user)):
     result = admin_db.table("withdrawals").select("id,amount,asset,network,wallet_address,status,review_note,created_at,reviewed_at").eq("user_id", user["id"]).order("created_at", desc=True).execute()
     return {"items": result.data or []}
 
 @app.get("/api/transactions")
-def transactions(user: dict = Depends(current_user)):
+def transactions(user: dict = Depends(member_user)):
     result = admin_db.table("transactions").select("id,kind,amount,asset,status,reference,created_at").eq("user_id", user["id"]).order("created_at", desc=True).execute()
     return {"items": result.data or []}
 
@@ -258,3 +267,4 @@ def update_plan(plan_id: str, payload: PlanUpdate, _: dict = Depends(admin_user)
         raise HTTPException(422, str(exc)) from exc
     result = admin_db.table("plans").update(allowed).eq("id", plan_id).execute()
     return {"items": result.data or []}
+
