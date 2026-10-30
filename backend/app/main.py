@@ -30,6 +30,31 @@ app.include_router(member_features_router)
 def health():
     return {"status": "ok", "service": "northstar-capital-api"}
 
+@app.get("/api/auth/role")
+def auth_role(user: dict = Depends(current_user)):
+    """Return only the signed-in user's role for safe portal routing."""
+    try:
+        result = (
+            admin_db.table("profiles")
+            .select("role")
+            .eq("id", user["id"])
+            .maybe_single()
+            .execute()
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail="Could not verify account permissions.",
+        )
+
+    if not result.data or result.data.get("role") not in {"member", "admin"}:
+        raise HTTPException(
+            status_code=403,
+            detail="This account does not have an authorised portal role.",
+        )
+
+    return {"role": result.data["role"]}
+
 @app.get("/api/me")
 def me(user: dict = Depends(member_user)):
     result = admin_db.table("profiles").select("id,email,full_name,display_name,phone,role,kyc_status,kyc_uploaded_at,profile_image_path,created_at").eq("id", user["id"]).maybe_single().execute()

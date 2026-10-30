@@ -1,4 +1,4 @@
-﻿const cfg = window.NORTHSTAR_CONFIG || {};
+const cfg = window.NORTHSTAR_CONFIG || {};
 const configured = cfg.SUPABASE_URL && !cfg.SUPABASE_URL.includes('YOUR_PROJECT') && cfg.SUPABASE_ANON_KEY && !cfg.SUPABASE_ANON_KEY.includes('YOUR_PUBLIC');
 let supabase = null;
 let supabaseClientPromise = null;
@@ -32,8 +32,8 @@ async function redirectForVerifiedRole({signOutUnknown=false}={}){
 
   if (!activeSession?.access_token) return false;
 
-  const me = await api('/api/me');
-  const target = portalForRole(me?.profile?.role);
+  const roleData = await api('/api/auth/role');
+  const target = portalForRole(roleData?.role);
 
   if (target) {
     location.replace(target);
@@ -167,8 +167,8 @@ async function protect() {
       return false;
     }
 
-    const me = await api('/api/me');
-    const role = me?.profile?.role;
+    const roleData = await api('/api/auth/role');
+    const role = roleData?.role;
     const target = portalForRole(role);
 
     if (!target) {
