@@ -218,13 +218,17 @@ const pendingDeck=(d.deposits||[]).filter(x=>x.status==='pending').length+
 const kycStatus=profile.kyc_status||'not_submitted';
 const kycLabel=kycStatus==='verified'?'Required files uploaded':kycStatus==='pending'?'Pending review':'Not completed';
 const displayName=(profile.display_name||profile.full_name||profile.email||'there').trim();
-const tickers=[['BTC','Illustrative'],['ETH','Illustrative'],['SOL','Illustrative'],['USDT','Illustrative']];
+const marketData=await api('/api/market/prices').catch(()=>null);
+const tickers=marketData?.items||[];
+const formatMarketPrice=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:Number(value)<1?6:2}).format(Number(value));
+const marketTickerHtml=tickers.map(coin=>{const change=Number(coin.change_24h);const changeLabel=Number.isFinite(change)?`${change>=0?'+':''}${change.toFixed(2)}% ? 24h`:'24h change unavailable';return `<div class="ticker-item"><span>${esc(coin.name)} ? ${esc(coin.symbol)}</span><strong>${formatMarketPrice(coin.price_usd)}</strong><em>${esc(changeLabel)}</em></div>`;}).join('');
+const marketNotice=!marketData?'<p class="notice">Live market data is temporarily unavailable. Prices are not being displayed.</p>':marketData.stale?'<p class="notice">Market provider unavailable. Showing previously fetched prices; they may be out of date.</p>':`<p class="form-note">Reference prices in USD | Source: CoinGecko | Updated ${esc(new Date(marketData.fetched_at).toLocaleTimeString())}</p>`;
 const bars=[18,32,24,42,58,51,70,78,68,84,82,96];
 const statusText=v=>String(v||'pending').replace(/_/g,' ');
 main.innerHTML=`<div class="dashboard-summary">
 <div class="dashboard-topbar"><div><p class="eyebrow">PORTFOLIO</p><h2>Welcome back, ${esc(displayName)}</h2><p>Your account overview and investment activity.</p></div><span class="chip">${esc(kycLabel)}</span></div>
-<div class="ticker-strip">${tickers.map(([label,kind])=>`<div class="ticker-item"><span>${label}</span><strong>?</strong><em>${kind}</em></div>`).join('')}</div>
-<p class="notice">Market prices are not connected. Asset labels above are illustrative only.</p>
+<div class="ticker-strip">${marketTickerHtml||'<div class="empty-state">No market prices available.</div>'}</div>
+${marketNotice}
 <div class="stat-grid">
 <article class="card stat-card"><p>Available balance</p><strong>${money(balance,d.wallet?.asset||'USDT')}</strong><small>Current wallet ledger balance</small></article>
 <article class="card stat-card"><p>Recorded investment returns</p><strong>${money(totalReturn,'USDT')}</strong><small>Sum of returns entered in your investment records</small></article>

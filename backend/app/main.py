@@ -1,3 +1,8 @@
+import json
+import time
+from urllib.request import Request, urlopen
+from urllib.error import URLError, HTTPError
+from datetime import datetime, timezone
 import logging
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,6 +34,102 @@ app.include_router(member_features_router)
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "northstar-capital-api"}
+
+
+
+_market_cache = {"items": None, "fetched_at": None, "cached_at": 0.0}
+
+@app.get("/api/market/prices")
+def market_prices():
+    """Return reference crypto market prices from CoinGecko."""
+    now = time.time()
+
+    if _market_cache["items"] is not None and now - _market_cache["cached_at"] < 60:
+        return {
+            "source": "CoinGecko",
+            "items": _market_cache["items"],
+            "fetched_at": _market_cache["fetched_at"],
+            "stale": False,
+        }
+
+    api_key = settings.coingecko_api_key.strip()
+    if not api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="Market data is not configured.",
+        )
+
+    url = (
+        "https://api.coingecko.com/api/v3/coins/markets"
+        "?vs_currency=usd"
+        "&ids=bitcoin%2Cethereum%2Csolana%2Ctether"
+        "&price_change_percentage=24h"
+    )
+    request = Request(
+        url,
+        headers={
+            "accept": "application/json",
+            "x-cg-demo-api-key": api_key,
+            "user-agent": "NorthstarCapital/1.0",
+        },
+    )
+
+    try:
+        with urlopen(request, timeout=10) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+
+        if not isinstance(payload, list) or not payload:
+            raise ValueError("Unexpected market data response")
+
+        items = []
+        for coin in payload:
+            price = coin.get("current_price")
+            if not isinstance(price, (int, float)):
+                continue
+
+            items.append({
+                "id": coin.get("id"),
+                "name": coin.get("name"),
+                "symbol": str(coin.get("symbol") or "").upper(),
+                "price_usd": price,
+                "change_24h": coin.get("price_change_percentage_24h"),
+                "market_cap": coin.get("market_cap"),
+                "total_volume": coin.get("total_volume"),
+                "last_updated": coin.get("last_updated"),
+            })
+
+        if not items:
+            raise ValueError("No usable market prices returned")
+
+        fetched_at = datetime.now(timezone.utc).isoformat()
+        _market_cache.update({
+            "items": items,
+            "fetched_at": fetched_at,
+            "cached_at": time.time(),
+        })
+
+        return {
+            "source": "CoinGecko",
+            "items": items,
+            "fetched_at": fetched_at,
+            "stale": False,
+        }
+
+    except (HTTPError, URLError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
+        logger.warning("Market data request failed: %s", type(exc).__name__)
+
+        if _market_cache["items"] is not None:
+            return {
+                "source": "CoinGecko",
+                "items": _market_cache["items"],
+                "fetched_at": _market_cache["fetched_at"],
+                "stale": True,
+            }
+
+        raise HTTPException(
+            status_code=503,
+            detail="Live market data is temporarily unavailable.",
+        )
 
 @app.get("/api/auth/role")
 def auth_role(user: dict = Depends(current_user)):
