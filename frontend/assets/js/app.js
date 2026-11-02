@@ -1,4 +1,4 @@
-﻿const cfg = window.NORTHSTAR_CONFIG || {};
+const cfg = window.NORTHSTAR_CONFIG || {};
 const configured = cfg.SUPABASE_URL && !cfg.SUPABASE_URL.includes('YOUR_PROJECT') && cfg.SUPABASE_ANON_KEY && !cfg.SUPABASE_ANON_KEY.includes('YOUR_PUBLIC');
 let supabase = null;
 let supabaseClientPromise = null;
@@ -61,6 +61,64 @@ const root = location.pathname.includes('/pages/') ||
   ? '../'
   : '';
 
+
+/* NORTHSTAR_THEME_SYSTEM */
+const THEME_KEY = 'northstar-theme';
+
+function getPreferredTheme() {
+  const saved = localStorage.getItem(THEME_KEY);
+  if (saved === 'light' || saved === 'dark') return saved;
+  return window.matchMedia('(prefers-color-scheme: light)').matches
+    ? 'light'
+    : 'dark';
+}
+
+function applyTheme(theme) {
+  const selected = theme === 'light' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = selected;
+  document.documentElement.style.colorScheme = selected;
+
+  const toggle = document.querySelector('[data-theme-toggle]');
+  if (toggle) {
+    const isDark = selected === 'dark';
+    toggle.setAttribute('aria-pressed', String(isDark));
+    toggle.setAttribute(
+      'aria-label',
+      isDark ? 'Switch to light mode' : 'Switch to dark mode'
+    );
+    toggle.innerHTML = isDark
+      ? '<span aria-hidden="true">?</span><span>Light mode</span>'
+      : '<span aria-hidden="true">?</span><span>Dark mode</span>';
+  }
+}
+
+function initTheme() {
+  applyTheme(getPreferredTheme());
+
+  window.matchMedia('(prefers-color-scheme: light)')
+    .addEventListener('change', event => {
+      if (!localStorage.getItem(THEME_KEY)) {
+        applyTheme(event.matches ? 'light' : 'dark');
+      }
+    });
+}
+
+function bindThemeToggle() {
+  const toggle = document.querySelector('[data-theme-toggle]');
+  if (!toggle || toggle.dataset.bound === 'true') return;
+
+  toggle.dataset.bound = 'true';
+  toggle.addEventListener('click', () => {
+    const next = document.documentElement.dataset.theme === 'dark'
+      ? 'light'
+      : 'dark';
+
+    localStorage.setItem(THEME_KEY, next);
+    applyTheme(next);
+  });
+}
+/* END NORTHSTAR_THEME_SYSTEM */
+
 function nav() {
   const publicItems = [
     ['Home', 'index.html'],
@@ -93,6 +151,14 @@ function nav() {
     ? `<a href="${root}index.html" data-logout>Sign out</a>`
     : `<a class="btn btn-outline" href="${root}pages/login.html">Login</a>
        <a class="btn btn-primary" href="${root}pages/register.html">Create account</a>`);
+
+  n.insertAdjacentHTML('beforeend', `
+    <button type="button" class="theme-toggle" data-theme-toggle
+      aria-label="Switch colour theme" aria-pressed="false">
+      <span aria-hidden="true">?</span><span>Light mode</span>
+    </button>
+  `);
+  bindThemeToggle();
 
   $('.menu-toggle')?.addEventListener('click', () => {
     const open = n.classList.toggle('open');
@@ -2996,6 +3062,7 @@ function bindPublic() {
 }
 
 async function init() {
+  initTheme();
   nav();
   footer();
 
