@@ -37,6 +37,11 @@ origins = [
     for x in settings.cors_origins.split(",")
     if x.strip()
 ]
+origins = list(dict.fromkeys([
+    *origins,
+    "http://127.0.0.1:5500",
+    "http://localhost:5500",
+]))
 
 app.add_middleware(
     CORSMiddleware,
@@ -746,7 +751,7 @@ def admin_deposits(
         .limit(limit)
     )
 
-    if status:
+    if status and status != "all":
         q = q.eq("status", status)
 
     return {
@@ -859,7 +864,7 @@ def admin_withdrawals(
         .limit(limit)
     )
 
-    if status:
+    if status and status != "all":
         q = q.eq("status", status)
 
     return {

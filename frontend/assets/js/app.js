@@ -19,7 +19,10 @@ async function getSupabase() {
   return supabaseClientPromise;
 }
 
-const API = cfg.API_BASE_URL || 'https://broker-backend-delta.vercel.app';
+const isLocalFrontend = ['localhost', '127.0.0.1'].includes(location.hostname);
+const API = isLocalFrontend
+  ? 'http://127.0.0.1:8000'
+  : cfg.API_BASE_URL || 'https://broker-backend-delta.vercel.app';
 const page = document.body.dataset.page || 'home';
 const app = document.querySelector('#app');
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -242,7 +245,12 @@ async function api(path, options = {}) {
     headers['Content-Type'] = 'application/json';
   }
 
-  const r = await fetch(`${API}${path}`, { ...options, headers });
+  let r;
+  try {
+    r = await fetch(`${API}${path}`, { ...options, headers });
+  } catch {
+    throw new Error(`Cannot reach the API. Check that it is online and allows requests from ${location.origin}.`);
+  }
 
   let body = {};
   try {
@@ -2377,26 +2385,35 @@ async function memberPage() {
     else if (page === 'admin-overview') {
       const d = await api('/api/admin/overview');
 
-      main.innerHTML = `<div class="grid grid-3">
-        <article class="card stat-card">
+      main.innerHTML = `<div class="grid grid-3 admin-overview-grid">
+        <a class="admin-overview-card" href="users.html" aria-label="View registered users">
+          <article class="card stat-card">
           <p>Registered users</p>
           <strong>${d.users}</strong>
-        </article>
-        <article class="card stat-card">
+            <span>View users <span aria-hidden="true">→</span></span>
+          </article>
+        </a>
+        <a class="admin-overview-card" href="deposits.html?status=pending" aria-label="Review pending deposits">
+          <article class="card stat-card">
           <p>Pending deposits</p>
           <strong>${d.pending_deposits}</strong>
-          <a href="deposits.html">Reconcile requests</a>
-        </article>
-        <article class="card stat-card">
+            <span>Review deposits <span aria-hidden="true">→</span></span>
+          </article>
+        </a>
+        <a class="admin-overview-card" href="withdrawals.html?status=pending" aria-label="Review pending withdrawals">
+          <article class="card stat-card">
           <p>Pending withdrawals</p>
           <strong>${d.pending_withdrawals}</strong>
-          <a href="withdrawals.html">Review requests</a>
-        </article>
-        <article class="card stat-card">
+            <span>Review withdrawals <span aria-hidden="true">→</span></span>
+          </article>
+        </a>
+        <a class="admin-overview-card" href="withdrawals.html?status=approved" aria-label="Record approved withdrawals awaiting transfer">
+          <article class="card stat-card">
           <p>Approved withdrawals awaiting transfer</p>
           <strong>${d.approved_withdrawals}</strong>
-          <a href="withdrawals.html">Record transfers</a>
-        </article>
+            <span>Record transfers <span aria-hidden="true">→</span></span>
+          </article>
+        </a>
       </div>
       <div class="notice" style="margin-top:20px">
         Manually verify incoming bank receipts and blockchain transactions before approving deposits. Withdrawal approval is not a transfer; record a transfer reference only after funds are sent.
@@ -2677,9 +2694,18 @@ async function memberPage() {
     }
 
     else if (page === 'admin-deposits') {
-      const d = await api('/api/admin/deposits');
+      const allowedStatuses = ['pending', 'approved', 'rejected', 'all'];
+      const requestedStatus = new URLSearchParams(location.search).get('status');
+      const selectedStatus = allowedStatuses.includes(requestedStatus) ? requestedStatus : 'pending';
+      const query = selectedStatus === 'all' ? '' : `?status=${encodeURIComponent(selectedStatus)}`;
+      const d = await api(`/api/admin/deposits${query}`);
 
-      main.innerHTML = table(
+      main.innerHTML = `<div class="field admin-list-filter">
+        <label for="admin-record-status">Deposit status</label>
+        <select id="admin-record-status">
+          ${allowedStatuses.map(value => `<option value="${value}" ${selectedStatus === value ? 'selected' : ''}>${value === 'all' ? 'All requests' : value[0].toUpperCase() + value.slice(1)}</option>`).join('')}
+        </select>
+      </div>` + table(
         ['User', 'Payment method', 'Payment reported', 'USDT requested', 'Status', 'Review'],
         d.items.map(x =>
           `<tr>
@@ -2699,6 +2725,12 @@ async function memberPage() {
           </tr>`
         )
       );
+
+      $('#admin-record-status').addEventListener('change', event => {
+        const url = new URL(location.href);
+        url.searchParams.set('status', event.target.value);
+        location.assign(url);
+      });
 
       main.querySelectorAll('[data-review]').forEach(button => {
         button.addEventListener('click', async () => {
@@ -2743,9 +2775,18 @@ async function memberPage() {
     }
 
     else if (page === 'admin-withdrawals') {
-      const d = await api('/api/admin/withdrawals');
+      const allowedStatuses = ['pending', 'approved', 'completed', 'rejected', 'all'];
+      const requestedStatus = new URLSearchParams(location.search).get('status');
+      const selectedStatus = allowedStatuses.includes(requestedStatus) ? requestedStatus : 'pending';
+      const query = selectedStatus === 'all' ? '' : `?status=${encodeURIComponent(selectedStatus)}`;
+      const d = await api(`/api/admin/withdrawals${query}`);
 
-      main.innerHTML = table(
+      main.innerHTML = `<div class="field admin-list-filter">
+        <label for="admin-record-status">Withdrawal status</label>
+        <select id="admin-record-status">
+          ${allowedStatuses.map(value => `<option value="${value}" ${selectedStatus === value ? 'selected' : ''}>${value === 'all' ? 'All requests' : value[0].toUpperCase() + value.slice(1)}</option>`).join('')}
+        </select>
+      </div>` + table(
         ['User', 'Amount', 'Network', 'Wallet', 'Status', 'Review / transfer'],
         d.items.map(x =>
           `<tr>
@@ -2767,6 +2808,12 @@ async function memberPage() {
           </tr>`
         )
       );
+
+      $('#admin-record-status').addEventListener('change', event => {
+        const url = new URL(location.href);
+        url.searchParams.set('status', event.target.value);
+        location.assign(url);
+      });
 
       main.querySelectorAll('[data-review]').forEach(button => {
         button.addEventListener('click', async () => {
