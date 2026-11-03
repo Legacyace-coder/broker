@@ -1059,11 +1059,15 @@ def admin_investment_requests(
 
     query = (
         admin_db.table("investment_requests")
-        .select(
-            "*,profiles(email,full_name,display_name),"
-            "plans(name,minimum_amount,maximum_amount)"
-        )
-        .order("created_at", desc=True)
+       .select(
+    "*,"
+    "profiles!investment_requests_user_id_fkey("
+    "email,full_name,display_name"
+    "),"
+    "plans!investment_requests_plan_id_fkey("
+    "name,minimum_amount,maximum_amount"
+    ")"
+)
     )
 
     if status in {
@@ -1179,7 +1183,10 @@ def admin_contracts(
         admin_db.table("investment_contracts")
         .select(
             "id,user_id,principal,asset,status,created_at,ends_at,"
-            "profiles(email,full_name,display_name),plans(name)"
+            "profiles!investment_contracts_user_id_fkey("
+            "email,full_name,display_name"
+            "),"
+            "plans!investment_contracts_plan_id_fkey(name)"
         )
         .order("created_at", desc=True)
         .execute()
