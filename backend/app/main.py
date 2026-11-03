@@ -746,7 +746,7 @@ def admin_deposits(
 
     q = (
         admin_db.table("deposits")
-        .select("*,profiles(email,full_name)")
+        .select("*,profiles!deposits_user_id_fkey(email,full_name)")
         .order("created_at", desc=True)
         .limit(limit)
     )
@@ -859,7 +859,7 @@ def admin_withdrawals(
 
     q = (
         admin_db.table("withdrawals")
-        .select("*,profiles(email,full_name)")
+        .select("*,profiles!withdrawals_user_id_fkey(email,full_name)")
         .order("created_at", desc=True)
         .limit(limit)
     )
