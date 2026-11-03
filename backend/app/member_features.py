@@ -1170,6 +1170,26 @@ def review_investment_request(
 # ADMIN CONTRACT PERFORMANCE
 # ============================================================
 
+@router.get("/api/admin/contracts")
+def admin_contracts(
+    admin: dict = Depends(admin_user),
+):
+
+    result = (
+        admin_db.table("investment_contracts")
+        .select(
+            "id,user_id,principal,asset,status,created_at,ends_at,"
+            "profiles(email,full_name,display_name),plans(name)"
+        )
+        .order("created_at", desc=True)
+        .execute()
+    )
+
+    return {
+        "items": result.data or [],
+    }
+
+
 @router.post(
     "/api/admin/contracts/{contract_id}/performance",
     status_code=201,

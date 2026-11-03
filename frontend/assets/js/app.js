@@ -1,4 +1,4 @@
-const cfg = window.NORTHSTAR_CONFIG || {};
+﻿const cfg = window.NORTHSTAR_CONFIG || {};
 const configured = cfg.SUPABASE_URL && !cfg.SUPABASE_URL.includes('YOUR_PROJECT') && cfg.SUPABASE_ANON_KEY && !cfg.SUPABASE_ANON_KEY.includes('YOUR_PUBLIC');
 let supabase = null;
 let supabaseClientPromise = null;
@@ -87,8 +87,8 @@ function applyTheme(theme) {
       isDark ? 'Switch to light mode' : 'Switch to dark mode'
     );
     toggle.innerHTML = isDark
-      ? '<span aria-hidden="true">?</span><span>Light mode</span>'
-      : '<span aria-hidden="true">?</span><span>Dark mode</span>';
+      ? '<span class="theme-toggle-icon" aria-hidden="true">☀️</span><span>Light mode</span>'
+      : '<span class="theme-toggle-icon" aria-hidden="true">🌙</span><span>Dark mode</span>';
   }
 }
 
@@ -155,10 +155,11 @@ function nav() {
   n.insertAdjacentHTML('beforeend', `
     <button type="button" class="theme-toggle" data-theme-toggle
       aria-label="Switch colour theme" aria-pressed="false">
-      <span aria-hidden="true">?</span><span>Light mode</span>
+      <span class="theme-toggle-icon" aria-hidden="true">☀️</span><span>Light mode</span>
     </button>
   `);
   bindThemeToggle();
+  applyTheme(document.documentElement.dataset.theme);
 
   $('.menu-toggle')?.addEventListener('click', () => {
     const open = n.classList.toggle('open');
@@ -1991,8 +1992,8 @@ async function memberPage() {
 
         const requestRows = requests.length
           ? requests.map(r => `<tr>
-              <td>${esc(r.plan_name || r.plan?.name || 'Investment plan')}</td>
-              <td>${money(Number(r.amount || 0), 'USDT')}</td>
+              <td>${esc(r.plan_name || r.plans?.name || 'Investment plan')}</td>
+              <td>${money(Number(r.requested_amount || 0), 'USDT')}</td>
               <td>${status(r.status || 'pending')}</td>
               <td>${esc(r.member_note || '?')}</td>
               <td>${date(r.created_at)}</td>
@@ -2821,7 +2822,13 @@ async function memberPage() {
     }
 
     else if (page === 'admin-plans') {
-      const d = await api('/api/admin/plans');
+      const [d, requestData, contractData] = await Promise.all([
+        api('/api/admin/plans'),
+        api('/api/admin/investment-requests?status=pending'),
+        api('/api/admin/contracts')
+      ]);
+      const requests = requestData.items || [];
+      const contracts = contractData.items || [];
 
       main.innerHTML = `<form id="plan-form" class="form-card form-grid">
         <h2>Create a service category</h2>
@@ -2857,7 +2864,126 @@ async function memberPage() {
         ['maximum_amount', 'Maximum'],
         ['active', 'Active'],
         ['created_at', 'Created']
-      ])}`;
+      ])}
+
+      <section style="margin-top:32px">
+        <h2>Investment requests awaiting review</h2>
+        ${requests.length
+          ? `<div class="table-wrap">
+              <table>
+                <thead><tr><th>Member</th><th>Plan</th><th>Requested</th><th>Submitted</th><th>Member note</th><th>Review</th></tr></thead>
+                <tbody>${requests.map(request => `<tr>
+                  <td>${esc(request.profiles?.full_name || request.profiles?.display_name || request.profiles?.email || request.user_id)}</td>
+                  <td>${esc(request.plans?.name || 'Investment plan')}</td>
+                  <td>${money(request.requested_amount, request.asset || 'USDT')}</td>
+                  <td>${esc(date(request.created_at))}</td>
+                  <td>${esc(request.member_note || '—')}</td>
+                  <td><div class="actions">
+                    <button class="btn btn-primary small-btn" type="button" data-investment-review="approved" data-id="${esc(request.id)}">Approve</button>
+                    <button class="btn btn-outline small-btn" type="button" data-investment-review="rejected" data-id="${esc(request.id)}">Reject</button>
+                  </div></td>
+                </tr>`).join('')}</tbody>
+              </table>
+            </div>`
+          : '<div class="empty-state">There are no pending investment requests.</div>'}
+      </section>
+
+      <section style="margin-top:32px">
+        <h2>Active investment contracts</h2>
+        ${contracts.length
+          ? contracts.map(contract => `<article class="card" style="margin-top:16px">
+              <div class="dashboard-topbar">
+                <div>
+                  <h3>${esc(contract.plans?.name || 'Investment contract')}</h3>
+                  <p class="muted">${esc(contract.profiles?.full_name || contract.profiles?.display_name || contract.profiles?.email || contract.user_id)} · ${money(contract.principal, contract.asset || 'USDT')}</p>
+                </div>
+                ${status(contract.status)}
+              </div>
+              ${contract.status === 'active'
+                ? `<form class="form-grid contract-performance-form" data-contract-id="${esc(contract.id)}" style="margin-top:16px">
+                    <div class="field">
+                      <label>Period start</label>
+                      <input name="period_start" type="date" required>
+                    </div>
+                    <div class="field">
+                      <label>Period end</label>
+                      <input name="period_end" type="date" required>
+                    </div>
+                    <div class="field">
+                      <label>Return or loss (USDT)</label>
+                      <input name="return_amount" type="number" step="0.00000001" required>
+                    </div>
+                    <div class="field">
+                      <label>Note (optional)</label>
+                      <input name="note" maxlength="1000">
+                    </div>
+                    <button class="btn btn-outline" type="submit">Record performance</button>
+                    <div class="form-message" aria-live="polite"></div>
+                  </form>`
+                : '<p class="muted">Performance entry is available only for active contracts.</p>'}
+            </article>`).join('')
+          : '<div class="empty-state">Approved contracts will appear here.</div>'}
+      </section>`;
+
+      main.querySelectorAll('.contract-performance-form').forEach(form => {
+        form.addEventListener('submit', async event => {
+          event.preventDefault();
+          const fields = new FormData(form);
+          const button = form.querySelector('button[type="submit"]');
+          const message = form.querySelector('.form-message');
+          button.disabled = true;
+
+          try {
+            const result = await api(`/api/admin/contracts/${encodeURIComponent(form.dataset.contractId)}/performance`, {
+              method: 'POST',
+              body: JSON.stringify({
+                period_start: fields.get('period_start'),
+                period_end: fields.get('period_end'),
+                return_amount: Number(fields.get('return_amount')),
+                note: String(fields.get('note') || '').trim()
+              })
+            });
+            message.innerHTML = notice(result.message || 'Performance record saved.', 'success');
+            form.reset();
+          } catch (error) {
+            message.innerHTML = notice(error.message || 'Performance record could not be saved.', 'error');
+          } finally {
+            button.disabled = false;
+          }
+        });
+      });
+
+      main.querySelectorAll('[data-investment-review]').forEach(button => {
+        button.addEventListener('click', async () => {
+          const action = button.dataset.investmentReview;
+          let adminNote = '';
+
+          if (action === 'rejected') {
+            const note = prompt('Enter a reason for rejecting this investment request:');
+            if (note === null) return;
+            adminNote = note.trim();
+            if (!adminNote) {
+              alert('A rejection reason is required.');
+              return;
+            }
+          } else if (!confirm('Approve this investment request and create its contract?')) {
+            return;
+          }
+
+          button.disabled = true;
+
+          try {
+            await api(`/api/admin/investment-requests/${encodeURIComponent(button.dataset.id)}`, {
+              method: 'PATCH',
+              body: JSON.stringify({ status: action, admin_note: adminNote })
+            });
+            await memberPage('admin-plans');
+          } catch (error) {
+            alert(error.message || 'The investment request could not be reviewed.');
+            button.disabled = false;
+          }
+        });
+      });
 
       $('#plan-form').addEventListener('submit', async e => {
         e.preventDefault();
