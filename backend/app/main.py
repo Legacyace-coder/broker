@@ -434,7 +434,7 @@ def payment_instructions(
 ):
 
     fields = (
-        "method,network,wallet_address,instructions,"
+        "method,asset,network,wallet_address,instructions,"
         "bank_name,account_name,account_number,iban,"
         "swift_bic,currency"
     )
@@ -462,20 +462,21 @@ def create_deposit(
     user: dict = Depends(member_user),
 ):
 
-    if payload.asset.upper() != "USDT":
-        raise HTTPException(
-            422,
-            "Only USDT deposits are supported",
-        )
-
-    configured = (
+    configured_query = (
         admin_db.table("payment_instructions")
-        .select("method,network,currency")
+        .select("method,asset,network,currency")
         .eq("method", payload.payment_method)
         .eq("enabled", True)
-        .maybe_single()
-        .execute()
     )
+    if payload.payment_method == "crypto":
+        configured_query = configured_query.eq(
+            "asset",
+            (payload.payment_currency or "USDT").upper(),
+        )
+    else:
+        configured_query = configured_query.eq("asset", "USDT")
+
+    configured = configured_query.maybe_single().execute()
 
     if not configured.data:
         raise HTTPException(
@@ -484,8 +485,12 @@ def create_deposit(
         )
 
     if payload.payment_method == "crypto":
-        payment_amount = Decimal(str(payload.amount))
-        payment_currency = "USDT"
+        payment_currency = (payload.payment_currency or "USDT").upper()
+        payment_amount = (
+            Decimal(str(payload.amount))
+            if payment_currency == "USDT"
+            else Decimal(str(payload.payment_amount))
+        )
         network = configured.data["network"]
 
     else:
@@ -779,7 +784,7 @@ def review_deposit(
 
     deposit_result = (
         admin_db.table("deposits")
-        .select("payment_method,amount,status")
+        .select("payment_method,payment_currency,amount,status")
         .eq("id", deposit_id)
         .maybe_single()
         .execute()
@@ -799,19 +804,20 @@ def review_deposit(
             "Deposit request has already been reviewed",
         )
 
-    if (
-        payload.status == "approved"
-        and deposit["payment_method"] == "bank"
-        and payload.credited_amount is None
-    ):
+    requires_manual_credit = (
+        deposit["payment_method"] == "bank"
+        or deposit.get("payment_currency") != "USDT"
+    )
+
+    if payload.status == "approved" and requires_manual_credit and payload.credited_amount is None:
         raise HTTPException(
             422,
-            "Enter the verified USDT credit amount for a bank transfer",
+            "Enter the verified USDT credit amount after reconciling this payment",
         )
 
     if (
         payload.status == "approved"
-        and deposit["payment_method"] == "crypto"
+        and not requires_manual_credit
         and payload.credited_amount is not None
         and payload.credited_amount != Decimal(str(deposit["amount"]))
     ):
@@ -954,38 +960,38 @@ def admin_payment_instructions(
         .execute()
     )
 
-    items = {
-        item["method"]: item
-        for item in result.data or []
+    rows = result.data or []
+    crypto = {
+        item["asset"]: item
+        for item in rows
+        if item["method"] == "crypto"
     }
+    bank = next((item for item in rows if item["method"] == "bank"), None)
+    supported_assets = ("USDT", "BTC", "ETH", "USDC")
 
     return {
         "items": [
-            items.get(
-                "crypto",
-                {
-                    "method": "crypto",
-                    "enabled": False,
-                    "network": "",
-                    "wallet_address": "",
-                    "instructions": "",
-                },
-            ),
-            items.get(
-                "bank",
-                {
-                    "method": "bank",
-                    "enabled": False,
-                    "bank_name": "",
-                    "account_name": "",
-                    "account_number": "",
-                    "iban": "",
-                    "swift_bic": "",
-                    "currency": "",
-                    "instructions": "",
-                },
-            ),
-        ],
+            crypto.get(asset, {
+                "method": "crypto",
+                "asset": asset,
+                "enabled": False,
+                "network": "",
+                "wallet_address": "",
+                "instructions": "",
+            })
+            for asset in supported_assets
+        ] + [bank or {
+            "method": "bank",
+            "asset": "USDT",
+            "enabled": False,
+            "bank_name": "",
+            "account_name": "",
+            "account_number": "",
+            "iban": "",
+            "swift_bic": "",
+            "currency": "",
+            "instructions": "",
+        }],
     }
 
 
@@ -1003,7 +1009,7 @@ def update_crypto_instructions(
 
     result = (
         admin_db.table("payment_instructions")
-        .upsert(data, on_conflict="method")
+        .upsert(data, on_conflict="method,asset")
         .execute()
     )
 
@@ -1011,9 +1017,10 @@ def update_crypto_instructions(
         "actor_id": admin["id"],
         "action": "payment_instructions_updated",
         "entity_type": "payment_instructions",
-        "entity_id": "crypto",
+        "entity_id": f"crypto:{payload.asset}",
         "details": {
             "method": "crypto",
+            "asset": payload.asset,
             "enabled": payload.enabled,
         },
     }).execute()
@@ -1031,13 +1038,14 @@ def update_bank_instructions(
 
     data = {
         "method": "bank",
+        "asset": "USDT",
         **payload.model_dump(),
         "updated_by": admin["id"],
     }
 
     result = (
         admin_db.table("payment_instructions")
-        .upsert(data, on_conflict="method")
+        .upsert(data, on_conflict="method,asset")
         .execute()
     )
 

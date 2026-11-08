@@ -8,7 +8,7 @@ PlanName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1,
 PlanDescription = Annotated[str, StringConstraints(strip_whitespace=True, max_length=1000)]
 PlanAmount = Annotated[Decimal, Field(gt=0, max_digits=20, decimal_places=8)]
 PaymentAmount = Annotated[Decimal, Field(gt=0, le=1_000_000, max_digits=20, decimal_places=8)]
-CurrencyCode = Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=3, pattern=r"^[A-Za-z]{3}$")]
+PaymentCurrency = Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=10, pattern=r"^[A-Za-z0-9]{3,10}$")]
 
 def validate_plan_amount_range(minimum_amount: Decimal, maximum_amount: Decimal | None) -> None:
     if maximum_amount is not None and maximum_amount < minimum_amount:
@@ -19,13 +19,22 @@ class DepositRequest(BaseModel):
     asset: Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=20)] = "USDT"
     payment_method: Literal["crypto", "bank"] = "crypto"
     payment_amount: PaymentAmount | None = None
-    payment_currency: CurrencyCode | None = None
+    payment_currency: PaymentCurrency | None = None
     reference: Annotated[str | None, StringConstraints(strip_whitespace=True, max_length=180)] = None
 
     @model_validator(mode="after")
     def validate_bank_payment(self):
-        if self.payment_method == "bank" and (self.payment_amount is None or self.payment_currency is None):
-            raise ValueError("Bank transfers require a payment amount and currency")
+        if self.payment_method == "crypto":
+            self.payment_currency = (self.payment_currency or "USDT").upper()
+            if self.payment_currency not in {"USDT", "BTC", "ETH", "USDC"}:
+                raise ValueError("Choose a supported crypto payment currency")
+            if self.payment_currency != "USDT" and self.payment_amount is None:
+                raise ValueError("Non-USDT crypto deposits require the amount sent")
+        else:
+            if self.payment_amount is None or self.payment_currency is None:
+                raise ValueError("Bank transfers require a payment amount and currency")
+            if len(self.payment_currency) != 3 or not self.payment_currency.isalpha():
+                raise ValueError("Bank payment currency must be a three-letter ISO code")
         return self
 
 class WithdrawalRequest(BaseModel):
@@ -48,6 +57,7 @@ class BalanceSetRequest(BaseModel):
     reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=500)]
 
 class CryptoInstructionsUpdate(BaseModel):
+    asset: Literal["USDT", "BTC", "ETH", "USDC"] = "USDT"
     enabled: bool
     network: Annotated[str, StringConstraints(strip_whitespace=True, max_length=40)] = ""
     wallet_address: Annotated[str, StringConstraints(strip_whitespace=True, max_length=220)] = ""

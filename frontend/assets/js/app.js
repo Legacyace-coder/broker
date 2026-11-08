@@ -39,6 +39,8 @@ const esc = (v = '') => String(v ?? '').replace(/[&<>"']/g, c => ({
 const money = (v, asset = 'USDT') =>
   `${Number(v || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })} ${esc(asset)}`;
 
+const paymentAssetLabel = asset => asset === 'ETH' ? 'Ethereum (ETH)' : asset;
+
 const date = v => v ? new Date(v).toLocaleString() : '—';
 const status = s => `<span class="badge ${esc(s || 'pending')}">${esc(s || 'pending')}</span>`;
 
@@ -1287,7 +1289,7 @@ function sidebar(admin = false) {
         ['Withdrawals', 'withdrawals.html'],
         ['Plans', 'investments.html'],
         ['Transactions', 'transactions.html'],
-        ['Partner program', 'partner-program.html'],
+        ['Referrals', 'partner-program.html'],
         ['Audit log', 'audit-log.html'],
         ['Settings', 'settings.html']
       ]
@@ -1298,7 +1300,7 @@ function sidebar(admin = false) {
         ['Investments', 'investments.html'],
         ['Withdrawals', 'withdrawals.html'],
         ['Transactions', 'transactions.html'],
-        ['Partner program', 'partner-program.html'],
+        ['Referrals', 'partner-program.html'],
         ['My profile', 'profile.html']
       ];
 
@@ -1321,7 +1323,7 @@ async function memberPage() {
         'admin-withdrawals': 'Withdrawal reviews',
         'admin-plans': 'Plans & products',
         'admin-transactions': 'Transactions',
-        'admin-partners': 'Partner program',
+        'admin-partners': 'Referrals',
         'admin-audit': 'Audit log',
         'admin-settings': 'Settings'
       }[page] || 'Administration')
@@ -1332,7 +1334,7 @@ async function memberPage() {
         investments: 'Investments',
         withdrawals: 'Withdrawals',
         transactions: 'Transactions',
-        'partner-program': 'Partner program',
+        'partner-program': 'Referrals',
         profile: 'My profile'
       }[page] || 'Member area');
 
@@ -1354,11 +1356,12 @@ async function memberPage() {
   try {
     if (page === 'dashboard') {
       const marketPromise = api('/api/market/prices').catch(() => null);
-      const [d, me, requestData, contractData] = await Promise.all([
+      const [d, me, requestData, contractData, referralData] = await Promise.all([
         api('/api/dashboard'),
         api('/api/me'),
         api('/api/member/investment-requests'),
-        api('/api/member/contracts')
+        api('/api/member/contracts'),
+        api('/api/member/referrals').catch(() => null)
       ]);
 
       const profile = me.profile || {};
@@ -1394,6 +1397,14 @@ async function memberPage() {
       const kycMessage = kycMessages[kycStatus] || kycMessages.not_submitted;
 
       const displayName = (profile.display_name || profile.full_name || profile.email || 'there').trim();
+      const profileImageUrl = typeof profile.profile_image_url === 'string' && /^https:\/\//i.test(profile.profile_image_url)
+        ? profile.profile_image_url
+        : null;
+      const profileInitial = displayName.slice(0, 1).toUpperCase();
+      const referralCode = String(referralData?.referral_code || '');
+      const referralScore = Number(referralData?.referral_score || 0);
+      const referralUrl = new URL('../pages/register.html', location.href);
+      if (referralCode) referralUrl.searchParams.set('ref', referralCode);
       const formatMarketPrice = value =>
         new Intl.NumberFormat('en-US', {
           style: 'currency',
@@ -1404,10 +1415,17 @@ async function memberPage() {
 
       main.innerHTML = `<div class="dashboard-summary">
         <div class="dashboard-topbar">
-          <div>
-            <p class="eyebrow">PORTFOLIO</p>
-            <h2>Welcome back, ${esc(displayName)}</h2>
-            <p>Your account overview and investment activity.</p>
+          <div class="dashboard-identity">
+            <div class="dashboard-avatar">
+              ${profileImageUrl
+                ? `<img src="${esc(profileImageUrl)}" alt="Profile photo for ${esc(displayName)}">`
+                : `<span aria-label="Profile photo placeholder">${esc(profileInitial)}</span>`}
+            </div>
+            <div>
+              <p class="eyebrow">PORTFOLIO</p>
+              <h2>Welcome back, ${esc(displayName)}</h2>
+              <p>Your account overview and investment activity.</p>
+            </div>
           </div>
           <span class="chip">${esc(kycLabel)}</span>
         </div>
@@ -1434,6 +1452,28 @@ async function memberPage() {
             <small>Principal plus recorded returns</small>
           </article>
         </div>
+
+        <section class="panel dashboard-referral-summary">
+          <div class="dashboard-topbar">
+            <div>
+              <p class="eyebrow">REFERRALS</p>
+              <h3>Your invite details</h3>
+            </div>
+            <a href="partner-program.html">View referrals</a>
+          </div>
+          ${referralCode
+            ? `<div class="referral-overview">
+                <div><span>Referral score</span><strong>${referralScore.toLocaleString()}</strong></div>
+                <div class="dashboard-referral-code-field"><label for="dashboard-referral-code">Your referral code</label><input id="dashboard-referral-code" class="referral-code-input" readonly value="${esc(referralCode)}"></div>
+              </div>
+              <label class="field dashboard-referral-link-field"><span>Invite link</span><input id="dashboard-referral-link" type="url" readonly value="${esc(referralUrl.href)}"></label>
+              <div class="actions">
+                <button class="btn btn-outline small-btn" id="copy-dashboard-referral-code" type="button">Copy code</button>
+                <button class="btn btn-outline small-btn" id="copy-dashboard-referral-link" type="button">Copy invite link</button>
+              </div>
+              <div id="dashboard-referral-message" aria-live="polite"></div>`
+            : '<p class="muted">Referral details are currently unavailable.</p>'}
+        </section>
 
         <section class="market-prices-section" aria-label="Live market prices">
           <div class="panel-header">
@@ -1603,6 +1643,23 @@ async function memberPage() {
         </div>
       </div>`;
 
+      if (referralCode) {
+        const copyReferralField = async selector => {
+          const field = $(selector, main);
+          try {
+            await navigator.clipboard.writeText(field.value);
+            $('#dashboard-referral-message', main).innerHTML = notice('Copied to clipboard.', 'success');
+          } catch {
+            field.focus();
+            field.select();
+            $('#dashboard-referral-message', main).innerHTML = notice('The value is selected. Copy it to continue.', 'error');
+          }
+        };
+
+        $('#copy-dashboard-referral-code', main).addEventListener('click', () => copyReferralField('#dashboard-referral-code'));
+        $('#copy-dashboard-referral-link', main).addEventListener('click', () => copyReferralField('#dashboard-referral-link'));
+      }
+
       marketPromise.then(marketData => {
         const tickers = marketData?.items || [];
         $('#market-ticker', main).innerHTML = tickers.map(coin => {
@@ -1631,7 +1688,8 @@ async function memberPage() {
       const instructionsResult = await api('/api/payment-instructions');
       const methods = instructionsResult.items || [];
       const available = methods.filter(item => item.enabled !== false);
-      const crypto = available.find(item => item.method === 'crypto');
+      const cryptoOptions = available.filter(item => item.method === 'crypto');
+      const defaultCryptoAsset = cryptoOptions.find(item => item.asset === 'USDT')?.asset || cryptoOptions[0]?.asset || '';
       const bank = available.find(item => item.method === 'bank');
 
       main.innerHTML = `<div class="notice">
@@ -1644,8 +1702,8 @@ async function memberPage() {
               ${available.map(item => item.method === 'crypto'
                 ? `<article class="instruction-card">
                     <p class="eyebrow">CRYPTO TRANSFER · ${esc(item.network)}</p>
-                    <h2>Send USDT</h2>
-                    <p>Only send USDT using the exact network shown. Transfers on the wrong network may be unrecoverable.</p>
+                    <h2>Send ${esc(paymentAssetLabel(item.asset || 'USDT'))}</h2>
+                    <p>Only send the selected asset using the exact network shown. Transfers on the wrong network may be unrecoverable.</p>
                     <div class="copy-field">
                       <code>${esc(item.wallet_address)}</code>
                       <button class="btn btn-outline small-btn" type="button" data-copy="${esc(item.wallet_address)}">Copy</button>
@@ -1674,22 +1732,29 @@ async function memberPage() {
               <div class="field">
                 <label for="deposit-method">Payment method</label>
                 <select name="payment_method" id="deposit-method" required>
-                  ${crypto ? '<option value="crypto">USDT transfer</option>' : ''}
+                  ${cryptoOptions.length ? '<option value="crypto">Crypto transfer</option>' : ''}
                   ${bank ? `<option value="bank">Bank transfer (${esc(bank.currency)})</option>` : ''}
                 </select>
               </div>
 
+              ${cryptoOptions.length ? `<div class="field" id="deposit-asset-field">
+                <label for="deposit-asset">Crypto asset</label>
+                <select name="crypto_asset" id="deposit-asset" required>
+                  ${cryptoOptions.map(item => `<option value="${esc(item.asset)}" ${item.asset === defaultCryptoAsset ? 'selected' : ''}>${esc(paymentAssetLabel(item.asset))}</option>`).join('')}
+                </select>
+              </div>` : ''}
+
               <div class="field">
-                <label for="deposit-amount" id="deposit-amount-label">USDT amount sent</label>
+                <label for="deposit-amount" id="deposit-amount-label">Amount</label>
                 <input id="deposit-amount" name="amount" type="number" min="0.00000001" max="1000000" step="0.00000001" required>
               </div>
 
               <div class="field hidden" id="bank-amount-field">
-                <label for="bank-payment-amount">Amount sent (${esc(bank?.currency || 'currency')})</label>
+                <label for="bank-payment-amount" id="payment-amount-label">Amount sent (${esc(bank?.currency || 'currency')})</label>
                 <input id="bank-payment-amount" name="payment_amount" type="number" min="0.00000001" max="1000000" step="0.00000001">
               </div>
 
-              <input name="payment_currency" id="payment-currency" type="hidden" value="${esc(crypto ? 'USDT' : bank?.currency || '')}">
+              <input name="payment_currency" id="payment-currency" type="hidden" value="${esc(defaultCryptoAsset || bank?.currency || '')}">
 
               <div class="field">
                 <label for="deposit-reference">Transfer reference or transaction ID</label>
@@ -1703,15 +1768,27 @@ async function memberPage() {
 
       $('#deposit-method')?.addEventListener('change', e => {
         const isBank = e.currentTarget.value === 'bank';
-        $('#bank-amount-field').classList.toggle('hidden', !isBank);
-        $('#bank-payment-amount').required = isBank;
-        $('#deposit-amount-label').textContent = isBank
+        const selectedAsset = isBank
+          ? ''
+          : $('#deposit-asset')?.value || defaultCryptoAsset || 'USDT';
+        const needsManualCredit = isBank || selectedAsset !== 'USDT';
+
+        $('#deposit-asset-field')?.classList.toggle('hidden', isBank);
+        $('#bank-amount-field').classList.toggle('hidden', !needsManualCredit);
+        $('#bank-payment-amount').required = needsManualCredit;
+        $('#deposit-amount-label').textContent = needsManualCredit
           ? 'Requested USDT credit (admin-confirmed)'
           : 'USDT amount sent';
-        $('#payment-currency').value = isBank ? (bank?.currency || '') : 'USDT';
+        $('#payment-amount-label').textContent = isBank
+          ? `Amount sent (${bank?.currency || 'currency'})`
+          : `Amount sent (${selectedAsset})`;
+        $('#payment-currency').value = isBank ? (bank?.currency || '') : selectedAsset;
       });
 
       $('#deposit-method')?.dispatchEvent(new Event('change'));
+      $('#deposit-asset')?.addEventListener('change', () => {
+        $('#deposit-method')?.dispatchEvent(new Event('change'));
+      });
 
       main.querySelectorAll('[data-copy]').forEach(button => {
         button.addEventListener('click', async () => {
@@ -1733,6 +1810,10 @@ async function memberPage() {
         e.preventDefault();
         const f = new FormData(e.currentTarget);
         const method = f.get('payment_method');
+        const selectedAsset = method === 'crypto'
+          ? $('#deposit-asset')?.value || defaultCryptoAsset || 'USDT'
+          : 'USDT';
+        const needsManualCredit = method === 'bank' || selectedAsset !== 'USDT';
 
         try {
           const r = await api('/api/deposits', {
@@ -1741,8 +1822,8 @@ async function memberPage() {
               amount: Number(f.get('amount')),
               asset: 'USDT',
               payment_method: method,
-              payment_amount: method === 'bank' ? Number(f.get('payment_amount')) : null,
-              payment_currency: method === 'bank' ? f.get('payment_currency') : 'USDT',
+              payment_amount: needsManualCredit ? Number(f.get('payment_amount')) : null,
+              payment_currency: method === 'bank' ? f.get('payment_currency') : selectedAsset,
               reference: f.get('reference') || null
             })
           });
@@ -2818,7 +2899,7 @@ async function memberPage() {
             <td>
               ${x.status === 'pending'
                 ? `<div class="actions">
-                    <button class="btn btn-primary small-btn" data-review="approved" data-id="${esc(x.id)}" data-method="${esc(x.payment_method || 'crypto')}" data-amount="${esc(x.amount)}">Approve after reconciliation</button>
+                    <button class="btn btn-primary small-btn" data-review="approved" data-id="${esc(x.id)}" data-method="${esc(x.payment_method || 'crypto')}" data-currency="${esc(x.payment_currency || 'USDT')}" data-amount="${esc(x.amount)}">Approve after reconciliation</button>
                     <button class="btn btn-outline small-btn" data-review="rejected" data-id="${esc(x.id)}" data-method="${esc(x.payment_method || 'crypto')}">Reject</button>
                   </div>`
                 : '—'}
@@ -2835,16 +2916,16 @@ async function memberPage() {
 
       main.querySelectorAll('[data-review]').forEach(button => {
         button.addEventListener('click', async () => {
-          const isBank = button.dataset.method === 'bank';
+          const needsManualCredit = button.dataset.method === 'bank' || button.dataset.currency !== 'USDT';
 
-          const credited = isBank && button.dataset.review === 'approved'
-            ? prompt('Enter the verified USDT amount to credit. Confirm bank receipt and conversion first:')
+          const credited = needsManualCredit && button.dataset.review === 'approved'
+            ? prompt('Enter the verified USDT amount to credit after confirming receipt and conversion:')
             : null;
 
-          if (isBank && button.dataset.review === 'approved' && credited === null) return;
+          if (needsManualCredit && button.dataset.review === 'approved' && credited === null) return;
 
           if (
-            isBank &&
+            needsManualCredit &&
             button.dataset.review === 'approved' &&
             (!Number.isFinite(Number(credited)) || Number(credited) <= 0)
           ) {
@@ -2862,7 +2943,7 @@ async function memberPage() {
                 status: button.dataset.review,
                 note: note || null,
                 credited_amount: button.dataset.review === 'approved'
-                  ? (isBank ? Number(credited) : Number(button.dataset.amount))
+                  ? (needsManualCredit ? Number(credited) : Number(button.dataset.amount))
                   : null
               })
             });
@@ -3251,7 +3332,7 @@ async function memberPage() {
 
     else if (page === 'admin-settings') {
       const d = await api('/api/admin/payment-instructions');
-      const crypto = d.items.find(item => item.method === 'crypto') || {};
+      const cryptoOptions = d.items.filter(item => item.method === 'crypto');
       const bank = d.items.find(item => item.method === 'bank') || {};
 
       main.innerHTML = `<p class="muted">
@@ -3259,9 +3340,9 @@ async function memberPage() {
       </p>
 
       <div class="settings-grid">
-        <form id="crypto-instructions-form" class="form-card form-grid settings-card">
-          <p class="eyebrow">USDT · CRYPTO</p>
-          <h2>Crypto transfer instructions</h2>
+        ${cryptoOptions.map(crypto => `<form class="form-card form-grid settings-card crypto-instructions-form" data-asset="${esc(crypto.asset)}">
+          <p class="eyebrow">${esc(paymentAssetLabel(crypto.asset))} · CRYPTO</p>
+          <h2>${esc(paymentAssetLabel(crypto.asset))} transfer instructions</h2>
 
           <label class="toggle-row">
             <input type="checkbox" name="enabled" ${crypto.enabled ? 'checked' : ''}> Show to members
@@ -3269,11 +3350,11 @@ async function memberPage() {
 
           <div class="field">
             <label>Network</label>
-            <input name="network" maxlength="40" value="${esc(crypto.network || '')}" placeholder="For example, TRC20">
+            <input name="network" maxlength="40" value="${esc(crypto.network || '')}" placeholder="Network for ${esc(crypto.asset)}">
           </div>
 
           <div class="field">
-            <label>USDT wallet address</label>
+            <label>${esc(crypto.asset)} receiving address</label>
             <input name="wallet_address" maxlength="220" value="${esc(crypto.wallet_address || '')}" placeholder="Public receiving address">
           </div>
 
@@ -3282,9 +3363,9 @@ async function memberPage() {
             <textarea name="instructions" maxlength="1000">${esc(crypto.instructions || '')}</textarea>
           </div>
 
-          <button class="btn btn-primary">Save crypto instructions</button>
-          <div id="crypto-message" aria-live="polite"></div>
-        </form>
+          <button class="btn btn-primary">Save ${esc(crypto.asset)} instructions</button>
+          <div class="crypto-message" aria-live="polite"></div>
+        </form>`).join('')}
 
         <form id="bank-instructions-form" class="form-card form-grid settings-card">
           <p class="eyebrow">BANK TRANSFER</p>
@@ -3338,26 +3419,34 @@ async function memberPage() {
         Do not put card processor secrets, private keys or confidential credentials in these fields. These forms store payment destination details in the project database.
       </div>`;
 
-      $('#crypto-instructions-form').addEventListener('submit', async event => {
-        event.preventDefault();
+      $$('.crypto-instructions-form').forEach(form => {
+        form.addEventListener('submit', async event => {
+          event.preventDefault();
 
-        const form = new FormData(event.currentTarget);
+          const fields = new FormData(form);
+          const message = $('.crypto-message', form);
+          const button = form.querySelector('button[type="submit"]');
+          button.disabled = true;
 
-        try {
-          await api('/api/admin/payment-instructions/crypto', {
-            method: 'PUT',
-            body: JSON.stringify({
-              enabled: form.has('enabled'),
-              network: form.get('network'),
-              wallet_address: form.get('wallet_address'),
-              instructions: form.get('instructions')
-            })
-          });
+          try {
+            await api('/api/admin/payment-instructions/crypto', {
+              method: 'PUT',
+              body: JSON.stringify({
+                asset: form.dataset.asset,
+                enabled: fields.has('enabled'),
+                network: fields.get('network'),
+                wallet_address: fields.get('wallet_address'),
+                instructions: fields.get('instructions')
+              })
+            });
 
-          $('#crypto-message').innerHTML = notice('Crypto payment instructions saved.', 'success');
-        } catch (error) {
-          $('#crypto-message').innerHTML = notice(error.message, 'error');
-        }
+            message.innerHTML = notice(`${form.dataset.asset} instructions saved.`, 'success');
+          } catch (error) {
+            message.innerHTML = notice(error.message, 'error');
+          } finally {
+            button.disabled = false;
+          }
+        });
       });
 
       $('#bank-instructions-form').addEventListener('submit', async event => {
