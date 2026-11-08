@@ -193,6 +193,16 @@ function notice(msg, kind = '') {
 }
 
 function displayText(value, fallback = '') {
+  if (Array.isArray(value)) {
+    return value.map(error => {
+      const field = Array.isArray(error?.loc)
+        ? error.loc.filter(part => part !== 'body').join('.')
+        : '';
+      const message = error?.msg || error?.message || JSON.stringify(error);
+      return field ? `${field}: ${message}` : message;
+    }).join('; ') || fallback;
+  }
+
   let text = value;
   while (text && typeof text === 'object') {
     const nested = text.message ?? text.detail ?? text.error;
