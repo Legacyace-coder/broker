@@ -1,4 +1,5 @@
 
+from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import PurePosixPath
@@ -1081,6 +1082,88 @@ def member_referral_summary(
         "referral_code": profile.data["referral_code"],
         "referral_score": referrals.count or 0,
     }
+
+
+def build_admin_referral_summary(profiles: list[dict]) -> dict:
+    profiles_by_id = {profile["id"]: profile for profile in profiles}
+    counts = Counter(
+        profile["referred_by"]
+        for profile in profiles
+        if profile.get("referred_by")
+    )
+
+    referrers = [
+        {
+            "user_id": profile["id"],
+            "name": profile.get("full_name") or "Unnamed member",
+            "email": profile.get("email") or "",
+            "referral_code": profile.get("referral_code") or "",
+            "referral_count": counts[profile["id"]],
+            "created_at": profile.get("created_at"),
+        }
+        for profile in profiles
+        if profile.get("referral_code")
+    ]
+    referrers.sort(key=lambda item: (-item["referral_count"], item["name"].lower()))
+
+    referred_profiles = sorted(
+        (profile for profile in profiles if profile.get("referred_by")),
+        key=lambda profile: profile.get("created_at") or "",
+        reverse=True,
+    )
+    recent_referrals = []
+
+    for profile in referred_profiles[:50]:
+        referrer = profiles_by_id.get(profile["referred_by"], {})
+        recent_referrals.append({
+            "name": profile.get("full_name") or "Unnamed member",
+            "email": profile.get("email") or "",
+            "created_at": profile.get("created_at"),
+            "referrer_name": referrer.get("full_name") or "Unknown member",
+            "referrer_email": referrer.get("email") or "",
+            "referral_code": referrer.get("referral_code") or "",
+        })
+
+    return {
+        "total_referrals": len(referred_profiles),
+        "active_referrers": sum(1 for count in counts.values() if count),
+        "referrers": referrers,
+        "recent_referrals": recent_referrals,
+    }
+
+
+@router.get("/api/admin/referrals")
+def admin_referral_summary(
+    _: dict = Depends(admin_user),
+):
+    profiles = []
+    start = 0
+    page_size = 1000
+
+    try:
+        while True:
+            result = (
+                admin_db.table("profiles")
+                .select("id,email,full_name,referral_code,referred_by,created_at")
+                .order("created_at")
+                .range(start, start + page_size - 1)
+                .execute()
+            )
+            page = result.data or []
+            profiles.extend(page)
+            if len(page) < page_size:
+                break
+            start += page_size
+    except Exception as exc:
+        message = str(exc).lower()
+        if "referral_code" in message or "referred_by" in message:
+            raise HTTPException(
+                503,
+                "Referral data is not initialized. Apply the member referrals migration.",
+            ) from exc
+        raise
+
+    return build_admin_referral_summary(profiles)
 
 
 # ============================================================

@@ -3530,10 +3530,51 @@ async function memberPage() {
     }
 
     else if (page === 'admin-partners') {
-      main.innerHTML = `<div class="empty-state">
-        <h2>Configuration required</h2>
-        <p>This module is intentionally not active until its policy and operational requirements are defined.</p>
-      </div>`;
+      const referrals = await api('/api/admin/referrals');
+      const referrers = referrals.referrers || [];
+      const recentReferrals = referrals.recent_referrals || [];
+
+      main.innerHTML = `<div class="grid grid-3">
+        <article class="card stat-card">
+          <p>Attributed signups</p>
+          <strong>${Number(referrals.total_referrals || 0).toLocaleString()}</strong>
+        </article>
+        <article class="card stat-card">
+          <p>Members with referrals</p>
+          <strong>${Number(referrals.active_referrers || 0).toLocaleString()}</strong>
+        </article>
+        <article class="card stat-card">
+          <p>Referral codes</p>
+          <strong>${referrers.length.toLocaleString()}</strong>
+        </article>
+      </div>
+
+      <section style="margin-top:32px">
+        <h2>Referrers</h2>
+        ${table(
+          ['Member', 'Email', 'Referral code', 'Signups'],
+          referrers.map(item => `<tr>
+            <td>${esc(item.name)}</td>
+            <td>${esc(item.email || '—')}</td>
+            <td><code>${esc(item.referral_code)}</code></td>
+            <td>${Number(item.referral_count || 0).toLocaleString()}</td>
+          </tr>`)
+        )}
+      </section>
+
+      <section style="margin-top:32px">
+        <h2>Recent referred signups</h2>
+        ${table(
+          ['Member', 'Email', 'Referred by', 'Code', 'Joined'],
+          recentReferrals.map(item => `<tr>
+            <td>${esc(item.name)}</td>
+            <td>${esc(item.email || '—')}</td>
+            <td>${esc(item.referrer_name)}${item.referrer_email ? `<br><small>${esc(item.referrer_email)}</small>` : ''}</td>
+            <td><code>${esc(item.referral_code || '—')}</code></td>
+            <td>${esc(date(item.created_at))}</td>
+          </tr>`)
+        )}
+      </section>`;
     }
 
   } catch (err) {
