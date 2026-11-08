@@ -1048,6 +1048,42 @@ def member_contracts(
 
 
 # ============================================================
+# MEMBER REFERRAL SUMMARY
+# ============================================================
+
+@router.get("/api/member/referrals")
+def member_referral_summary(
+    user: dict = Depends(member_user),
+):
+
+    profile = (
+        admin_db.table("profiles")
+        .select("referral_code")
+        .eq("id", user["id"])
+        .maybe_single()
+        .execute()
+    )
+
+    if not profile.data or not profile.data.get("referral_code"):
+        raise HTTPException(
+            503,
+            "Referral codes are not initialized. Apply the latest database migrations.",
+        )
+
+    referrals = (
+        admin_db.table("profiles")
+        .select("id", count="exact")
+        .eq("referred_by", user["id"])
+        .execute()
+    )
+
+    return {
+        "referral_code": profile.data["referral_code"],
+        "referral_score": referrals.count or 0,
+    }
+
+
+# ============================================================
 # ADMIN INVESTMENT REQUESTS
 # ============================================================
 

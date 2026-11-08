@@ -880,6 +880,10 @@ function authForm(title, sub, kind) {
     ? `<div class="field">
         <label for="full-name">Full name</label>
         <input id="full-name" name="full_name" required maxlength="120" autocomplete="name">
+      </div>
+      <div class="field">
+        <label for="referral-code">Referral code (optional)</label>
+        <input id="referral-code" name="referral_code" maxlength="20" value="${esc(new URLSearchParams(location.search).get('ref') || '')}" autocomplete="off">
       </div>`
     : '';
 
@@ -1148,6 +1152,7 @@ async function handleAuth() {
           options: {
             data: {
               full_name: data.get('full_name'),
+              referral_code: String(data.get('referral_code') || '').trim().toUpperCase(),
               tether_trc20_wallet: String(data.get('tether_trc20_wallet') || '').trim(),
               bitcoin_wallet: String(data.get('bitcoin_wallet') || '').trim(),
               usdc_wallet: String(data.get('usdc_wallet') || '').trim()
@@ -1338,6 +1343,7 @@ async function memberPage() {
 
   try {
     if (page === 'dashboard') {
+      const marketPromise = api('/api/market/prices').catch(() => null);
       const [d, me, requestData, contractData] = await Promise.all([
         api('/api/dashboard'),
         api('/api/me'),
@@ -1378,36 +1384,12 @@ async function memberPage() {
       const kycMessage = kycMessages[kycStatus] || kycMessages.not_submitted;
 
       const displayName = (profile.display_name || profile.full_name || profile.email || 'there').trim();
-      const marketData = await api('/api/market/prices').catch(() => null);
-      const tickers = marketData?.items || [];
-
       const formatMarketPrice = value =>
         new Intl.NumberFormat('en-US', {
           style: 'currency',
           currency: 'USD',
           maximumFractionDigits: Number(value) < 1 ? 6 : 2
         }).format(Number(value));
-
-      const marketTickerHtml = tickers.map(coin => {
-        const change = Number(coin.change_24h);
-        const changeLabel = Number.isFinite(change)
-          ? `${change >= 0 ? '+' : ''}${change.toFixed(2)}% · 24h`
-          : '24h change unavailable';
-
-        return `<div class="ticker-item">
-          <span>${esc(coin.name)} · ${esc(coin.symbol)}</span>
-          <strong>${formatMarketPrice(coin.price_usd)}</strong>
-          <em>${esc(changeLabel)}</em>
-        </div>`;
-      }).join('');
-
-      const marketNotice = !marketData
-        ? '<p class="notice">Live market data is temporarily unavailable. Prices are not being displayed.</p>'
-        : marketData.stale
-          ? '<p class="notice">Market provider unavailable. Showing previously fetched prices; they may be out of date.</p>'
-          : `<p class="form-note">Reference prices in USD | Source: CoinGecko | Updated ${esc(new Date(marketData.fetched_at).toLocaleTimeString())}</p>`;
-
-      const bars = [18, 32, 24, 42, 58, 51, 70, 78, 68, 84, 82, 96];
       const statusText = v => String(v || 'pending').replace(/_/g, ' ');
 
       main.innerHTML = `<div class="dashboard-summary">
@@ -1419,12 +1401,6 @@ async function memberPage() {
           </div>
           <span class="chip">${esc(kycLabel)}</span>
         </div>
-
-        <div class="ticker-strip">
-          ${marketTickerHtml || '<div class="empty-state">No market prices available.</div>'}
-        </div>
-
-        ${marketNotice}
 
         <div class="stat-grid">
           <article class="card stat-card stat-card-balance">
@@ -1448,6 +1424,19 @@ async function memberPage() {
             <small>Principal plus recorded returns</small>
           </article>
         </div>
+
+        <section class="market-prices-section" aria-label="Live market prices">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">MARKET REFERENCE</p>
+              <h3>Live prices</h3>
+            </div>
+          </div>
+          <div class="ticker-strip" id="market-ticker">
+            <div class="loading">Loading reference prices…</div>
+          </div>
+          <div id="market-notice" aria-live="polite"></div>
+        </section>
 
         <div class="dashboard-panels">
           <section class="panel canvas-panel">
@@ -1603,6 +1592,29 @@ async function memberPage() {
           </section>
         </div>
       </div>`;
+
+      marketPromise.then(marketData => {
+        const tickers = marketData?.items || [];
+        $('#market-ticker', main).innerHTML = tickers.map(coin => {
+          const change = Number(coin.change_24h);
+          const changeLabel = Number.isFinite(change)
+            ? `${change >= 0 ? '+' : ''}${change.toFixed(2)}% · 24h`
+            : '24h change unavailable';
+
+          return `<div class="ticker-item">
+            <span>${esc(coin.name)} · ${esc(coin.symbol)}</span>
+            <strong>${formatMarketPrice(coin.price_usd)}</strong>
+            <em>${esc(changeLabel)}</em>
+          </div>`;
+        }).join('') || '<div class="empty-state">No market prices available.</div>';
+
+        const message = !marketData
+          ? 'Live market data is temporarily unavailable. Prices are not being displayed.'
+          : marketData.stale
+            ? 'Market provider unavailable. Showing previously fetched prices; they may be out of date.'
+            : `Reference prices in USD | Source: CoinGecko | Updated ${new Date(marketData.fetched_at).toLocaleTimeString()}`;
+        $('#market-notice', main).innerHTML = notice(message);
+      });
     }
 
     else if (page === 'new-deposit') {
@@ -2132,10 +2144,50 @@ async function memberPage() {
     }
 
     else if (page === 'partner-program') {
-      main.innerHTML = `<div class="empty-state">
-        <h2>Partner program not configured</h2>
-        <p>Referral tracking, attribution and payouts require an approved program design and backend rules.</p>
-      </div>`;
+      try {
+        const referral = await api('/api/member/referrals');
+        const referralCode = String(referral.referral_code || '');
+        const referralUrl = new URL('../pages/register.html', location.href);
+        referralUrl.searchParams.set('ref', referralCode);
+
+        main.innerHTML = `<div class="referral-dashboard">
+          <section class="card referral-score-card">
+            <p class="eyebrow">YOUR REFERRAL SCORE</p>
+            <strong>${Number(referral.referral_score || 0).toLocaleString()}</strong>
+            <p>Members who signed up using your referral code.</p>
+          </section>
+          <section class="card referral-share-card">
+            <p class="eyebrow">YOUR REFERRAL CODE</p>
+            <strong class="referral-code">${esc(referralCode)}</strong>
+            <label class="field">
+              <span>Invite link</span>
+              <input id="referral-link" type="url" readonly value="${esc(referralUrl.href)}">
+            </label>
+            <div class="actions">
+              <button class="btn btn-primary" id="copy-referral-link" type="button">Copy invite link</button>
+              <button class="btn btn-outline" id="copy-referral-code" type="button">Copy code</button>
+            </div>
+            <div id="referral-copy-message" aria-live="polite"></div>
+          </section>
+        </div>`;
+
+        const copyReferralValue = async value => {
+          try {
+            await navigator.clipboard.writeText(value);
+            $('#referral-copy-message').innerHTML = notice('Copied to clipboard.', 'success');
+          } catch {
+            const input = $('#referral-link');
+            input.focus();
+            input.select();
+            $('#referral-copy-message').innerHTML = notice('Clipboard unavailable. The invite link is selected for copying.', 'error');
+          }
+        };
+
+        $('#copy-referral-link').addEventListener('click', () => copyReferralValue(referralUrl.href));
+        $('#copy-referral-code').addEventListener('click', () => copyReferralValue(referralCode));
+      } catch (error) {
+        main.innerHTML = `<div class="notice">${esc(error.message || 'Could not load your referral details.')}</div>`;
+      }
     }
 
     else if (page === 'profile') {
