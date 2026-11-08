@@ -2,6 +2,7 @@
 const configured = cfg.SUPABASE_URL && !cfg.SUPABASE_URL.includes('YOUR_PROJECT') && cfg.SUPABASE_ANON_KEY && !cfg.SUPABASE_ANON_KEY.includes('YOUR_PUBLIC');
 let supabase = null;
 let supabaseClientPromise = null;
+let memberProfilePromise = null;
 
 async function getSupabase() {
   if (!configured) throw new Error('Configure Supabase first.');
@@ -166,6 +167,11 @@ function nav() {
   bindThemeToggle();
   applyTheme(document.documentElement.dataset.theme);
 
+  if (isMember && !page.startsWith('admin-')) {
+    n.insertAdjacentHTML('beforeend', `<a class="nav-profile-avatar" href="${root}member/profile.html" data-profile-avatar aria-label="Open your profile"><span>U</span></a>`);
+    loadNavProfileAvatar();
+  }
+
   $('.menu-toggle')?.addEventListener('click', () => {
     const open = n.classList.toggle('open');
     $('.menu-toggle').setAttribute('aria-expanded', String(open));
@@ -188,6 +194,15 @@ function footer() {
   document.querySelectorAll('[data-year]').forEach(n => {
     n.textContent = new Date().getFullYear();
   });
+}
+
+function loadOptionalFonts() {
+  const stylesheet = document.createElement('link');
+  stylesheet.rel = 'stylesheet';
+  stylesheet.media = 'print';
+  stylesheet.href = 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap';
+  stylesheet.onload = () => { stylesheet.media = 'all'; };
+  document.head.append(stylesheet);
 }
 
 function notice(msg, kind = '') {
@@ -288,6 +303,40 @@ async function api(path, options = {}) {
   }
 
   return body;
+}
+
+function getMemberProfile() {
+  if (!memberProfilePromise) {
+    memberProfilePromise = api('/api/me').catch(error => {
+      memberProfilePromise = null;
+      throw error;
+    });
+  }
+  return memberProfilePromise;
+}
+
+function renderNavProfile(profile = {}) {
+  const avatar = $('[data-profile-avatar]');
+  if (!avatar) return;
+
+  const name = profile.display_name || profile.full_name || profile.email || 'User';
+  const imageUrl = typeof profile.profile_image_url === 'string' && /^https:\/\//i.test(profile.profile_image_url)
+    ? profile.profile_image_url
+    : null;
+
+  avatar.innerHTML = imageUrl
+    ? `<img src="${esc(imageUrl)}" alt="Profile photo for ${esc(name)}">`
+    : `<span>${esc(String(name).trim().slice(0, 1).toUpperCase())}</span>`;
+  avatar.title = name;
+}
+
+async function loadNavProfileAvatar() {
+  try {
+    const result = await getMemberProfile();
+    renderNavProfile(result.profile || {});
+  } catch {
+    $('[data-profile-avatar]')?.remove();
+  }
 }
 
 function pageHero(kicker, title, sub, actions = '', variant = '') {
@@ -1356,12 +1405,12 @@ async function memberPage() {
   try {
     if (page === 'dashboard') {
       const marketPromise = api('/api/market/prices').catch(() => null);
-      const [d, me, requestData, contractData, referralData] = await Promise.all([
+      const referralPromise = api('/api/member/referrals').catch(() => null);
+      const [d, me, requestData, contractData] = await Promise.all([
         api('/api/dashboard'),
-        api('/api/me'),
+        getMemberProfile(),
         api('/api/member/investment-requests'),
-        api('/api/member/contracts'),
-        api('/api/member/referrals').catch(() => null)
+        api('/api/member/contracts')
       ]);
 
       const profile = me.profile || {};
@@ -1401,10 +1450,6 @@ async function memberPage() {
         ? profile.profile_image_url
         : null;
       const profileInitial = displayName.slice(0, 1).toUpperCase();
-      const referralCode = String(referralData?.referral_code || '');
-      const referralScore = Number(referralData?.referral_score || 0);
-      const referralUrl = new URL('../pages/register.html', location.href);
-      if (referralCode) referralUrl.searchParams.set('ref', referralCode);
       const formatMarketPrice = value =>
         new Intl.NumberFormat('en-US', {
           style: 'currency',
@@ -1415,17 +1460,10 @@ async function memberPage() {
 
       main.innerHTML = `<div class="dashboard-summary">
         <div class="dashboard-topbar">
-          <div class="dashboard-identity">
-            <div class="dashboard-avatar">
-              ${profileImageUrl
-                ? `<img src="${esc(profileImageUrl)}" alt="Profile photo for ${esc(displayName)}">`
-                : `<span aria-label="Profile photo placeholder">${esc(profileInitial)}</span>`}
-            </div>
-            <div>
-              <p class="eyebrow">PORTFOLIO</p>
-              <h2>Welcome back, ${esc(displayName)}</h2>
-              <p>Your account overview and investment activity.</p>
-            </div>
+          <div>
+            <p class="eyebrow">PORTFOLIO</p>
+            <h2>Welcome back, ${esc(displayName)}</h2>
+            <p>Your account overview and investment activity.</p>
           </div>
           <span class="chip">${esc(kycLabel)}</span>
         </div>
@@ -1461,18 +1499,7 @@ async function memberPage() {
             </div>
             <a href="partner-program.html">View referrals</a>
           </div>
-          ${referralCode
-            ? `<div class="referral-overview">
-                <div><span>Referral score</span><strong>${referralScore.toLocaleString()}</strong></div>
-                <div class="dashboard-referral-code-field"><label for="dashboard-referral-code">Your referral code</label><input id="dashboard-referral-code" class="referral-code-input" readonly value="${esc(referralCode)}"></div>
-              </div>
-              <label class="field dashboard-referral-link-field"><span>Invite link</span><input id="dashboard-referral-link" type="url" readonly value="${esc(referralUrl.href)}"></label>
-              <div class="actions">
-                <button class="btn btn-outline small-btn" id="copy-dashboard-referral-code" type="button">Copy code</button>
-                <button class="btn btn-outline small-btn" id="copy-dashboard-referral-link" type="button">Copy invite link</button>
-              </div>
-              <div id="dashboard-referral-message" aria-live="polite"></div>`
-            : '<p class="muted">Referral details are currently unavailable.</p>'}
+          <div id="dashboard-referral-content"><p class="muted">Loading referral details…</p></div>
         </section>
 
         <section class="market-prices-section" aria-label="Live market prices">
@@ -1643,7 +1670,28 @@ async function memberPage() {
         </div>
       </div>`;
 
-      if (referralCode) {
+      referralPromise.then(referral => {
+        const target = $('#dashboard-referral-content', main);
+        const referralCode = String(referral?.referral_code || '');
+        if (!target) return;
+        if (!referralCode) {
+          target.innerHTML = '<p class="muted">Referral details are currently unavailable.</p>';
+          return;
+        }
+
+        const referralUrl = new URL('../pages/register.html', location.href);
+        referralUrl.searchParams.set('ref', referralCode);
+        target.innerHTML = `<div class="referral-overview">
+          <div><span>Referral score</span><strong>${Number(referral.referral_score || 0).toLocaleString()}</strong></div>
+          <div class="dashboard-referral-code-field"><label for="dashboard-referral-code">Your referral code</label><input id="dashboard-referral-code" class="referral-code-input" readonly value="${esc(referralCode)}"></div>
+        </div>
+        <label class="field dashboard-referral-link-field"><span>Invite link</span><input id="dashboard-referral-link" type="url" readonly value="${esc(referralUrl.href)}"></label>
+        <div class="actions">
+          <button class="btn btn-outline small-btn" id="copy-dashboard-referral-code" type="button">Copy code</button>
+          <button class="btn btn-outline small-btn" id="copy-dashboard-referral-link" type="button">Copy invite link</button>
+        </div>
+        <div id="dashboard-referral-message" aria-live="polite"></div>`;
+
         const copyReferralField = async selector => {
           const field = $(selector, main);
           try {
@@ -1658,7 +1706,7 @@ async function memberPage() {
 
         $('#copy-dashboard-referral-code', main).addEventListener('click', () => copyReferralField('#dashboard-referral-code'));
         $('#copy-dashboard-referral-link', main).addEventListener('click', () => copyReferralField('#dashboard-referral-link'));
-      }
+      });
 
       marketPromise.then(marketData => {
         const tickers = marketData?.items || [];
@@ -1808,7 +1856,8 @@ async function memberPage() {
 
       $('#deposit-form')?.addEventListener('submit', async e => {
         e.preventDefault();
-        const f = new FormData(e.currentTarget);
+        const form = e.currentTarget;
+        const f = new FormData(form);
         const method = f.get('payment_method');
         const selectedAsset = method === 'crypto'
           ? $('#deposit-asset')?.value || defaultCryptoAsset || 'USDT'
@@ -1829,7 +1878,7 @@ async function memberPage() {
           });
 
           $('#form-message').innerHTML = notice(r.message, 'success');
-          e.currentTarget.reset();
+          form.reset();
         } catch (err) {
           $('#form-message').innerHTML = notice(err.message, 'error');
         }
@@ -2286,7 +2335,7 @@ async function memberPage() {
 
       try {
         const [meData, kycData] = await Promise.all([
-          api('/api/me'),
+          getMemberProfile(),
           api('/api/kyc/documents')
         ]);
 
@@ -2511,6 +2560,10 @@ async function memberPage() {
             message.innerHTML = notice(result.message || 'Profile photo uploaded.', 'success');
             if (typeof result.profile_image_url === 'string' && /^https:\/\//i.test(result.profile_image_url)) {
               $('#profile-image-preview').innerHTML = `<img src="${esc(result.profile_image_url)}" alt="Your profile photo">`;
+              const profileData = await getMemberProfile();
+              profileData.profile = { ...profileData.profile, profile_image_url: result.profile_image_url };
+              memberProfilePromise = Promise.resolve(profileData);
+              renderNavProfile(profileData.profile);
             }
             form.reset();
           } catch (err) {
@@ -3511,6 +3564,7 @@ function bindPublic() {
 
 async function init() {
   initTheme();
+  loadOptionalFonts();
   nav();
   footer();
 
