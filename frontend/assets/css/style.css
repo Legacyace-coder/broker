@@ -1188,3 +1188,98 @@ td{color:#d7d9de}
 }
 
 /* END NORTHSTAR_THEME_SYSTEM */
+
+.profile-image-preview {
+  display: grid;
+  width: 112px;
+  aspect-ratio: 1;
+  place-items: center;
+  overflow: hidden;
+  margin: 0 0 18px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--panel2);
+  color: var(--gold);
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.profile-image-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.plan-management-list {
+  display: grid;
+  gap: 14px;
+}
+
+.plan-edit-form {
+  display: grid;
+  gap: 16px;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+.plan-edit-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.plan-edit-fields textarea {
+  min-height: 78px;
+}
+
+.plan-edit-actions {
+  align-items: center;
+}
+
+@media(max-width:580px) {
+  .plan-edit-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+:root[data-theme="light"] .member-dashboard-shell .stat-card-balance {
+  background: #eee8ff;
+  border-color: #d5c6ff;
+}
+
+:root[data-theme="light"] .member-dashboard-shell .stat-card-returns {
+  background: #fff0dd;
+  border-color: #f0d0a0;
+}
+
+:root[data-theme="light"] .member-dashboard-shell .stat-card-pending {
+  background: #e6f0ff;
+  border-color: #bfd5fa;
+}
+
+:root[data-theme="light"] .member-dashboard-shell .stat-card-contract {
+  background: #e5f4e8;
+  border-color: #c1e1c8;
+}
+
+:root[data-theme="dark"] .member-dashboard-shell .stat-card-balance {
+  background: #2b2540;
+  border-color: #51446e;
+}
+
+:root[data-theme="dark"] .member-dashboard-shell .stat-card-returns {
+  background: #3a2f20;
+  border-color: #6a5331;
+}
+
+:root[data-theme="dark"] .member-dashboard-shell .stat-card-pending {
+  background: #1e3046;
+  border-color: #3b5879;
+}
+
+:root[data-theme="dark"] .member-dashboard-shell .stat-card-contract {
+  background: #20392b;
+  border-color: #3a6547;
+}

@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from postgrest.exceptions import APIError
 from supabase import Client
 
-from .member_features import router as member_features_router
+from .member_features import private_signed_url, router as member_features_router
 from .config import settings
 from .security import admin_db, current_user, member_user, admin_user
 from .schemas import (
@@ -47,7 +47,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=False,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
@@ -240,6 +240,17 @@ PROFILE_FIELDS = (
 )
 
 
+def profile_with_signed_image(profile: dict | None) -> dict:
+    result = dict(profile or {})
+    storage_path = result.pop("profile_image_path", None)
+    result["profile_image_url"] = (
+        private_signed_url(storage_path)
+        if storage_path
+        else None
+    )
+    return result
+
+
 @app.get("/api/me")
 def me(user: dict = Depends(member_user)):
 
@@ -260,10 +271,10 @@ def me(user: dict = Depends(member_user)):
     )
 
     return {
-        "profile": result.data or {
+        "profile": profile_with_signed_image(result.data or {
             "id": user["id"],
             "email": user.get("email"),
-        },
+        }),
         "wallet": wallet.data or {
             "balance": 0,
             "asset": "USDT",
@@ -333,7 +344,7 @@ def update_me(
     )
 
     return {
-        "profile": result.data[0] if result.data else None,
+        "profile": profile_with_signed_image(result.data[0]) if result.data else None,
     }
 
 
@@ -1197,4 +1208,50 @@ def update_plan(
 
     return {
         "items": result.data or [],
+    }
+
+
+@app.delete("/api/admin/plans/{plan_id}")
+def delete_plan(
+    plan_id: str,
+    _: dict = Depends(admin_user),
+):
+
+    existing = (
+        admin_db.table("plans")
+        .select("id")
+        .eq("id", plan_id)
+        .maybe_single()
+        .execute()
+    )
+
+    if not existing.data:
+        raise HTTPException(404, "Plan not found")
+
+    pending_requests = (
+        admin_db.table("investment_requests")
+        .select("id")
+        .eq("plan_id", plan_id)
+        .eq("status", "pending")
+        .limit(1)
+        .execute()
+    )
+
+    if pending_requests.data:
+        raise HTTPException(
+            409,
+            "Review pending investment requests before deleting this plan.",
+        )
+
+    result = (
+        admin_db.table("plans")
+        .update({"active": False})
+        .eq("id", plan_id)
+        .select("id,name,active")
+        .execute()
+    )
+
+    return {
+        "message": "Plan removed from member listings. Existing contracts and history are unchanged.",
+        "item": result.data[0],
     }

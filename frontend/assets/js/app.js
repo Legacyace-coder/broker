@@ -189,7 +189,20 @@ function footer() {
 }
 
 function notice(msg, kind = '') {
-  return `<div class="status ${kind}" role="status">${esc(msg)}</div>`;
+  return `<div class="status ${kind}" role="status">${esc(displayText(msg))}</div>`;
+}
+
+function displayText(value, fallback = '') {
+  let text = value;
+  while (text && typeof text === 'object') {
+    const nested = text.message ?? text.detail ?? text.error;
+    if (nested === undefined) {
+      text = JSON.stringify(text);
+      break;
+    }
+    text = nested;
+  }
+  return text == null || text === '' ? fallback : String(text);
 }
 
 async function session() {
@@ -258,7 +271,8 @@ async function api(path, options = {}) {
   } catch {}
 
   if (!r.ok) {
-    throw new Error(body.detail || body.message || 'Request failed');
+    const reason = body.detail ?? body.message;
+    throw new Error(displayText(reason, 'Request failed'));
   }
 
   return body;
@@ -308,6 +322,8 @@ function rows(items, cols) {
       `<td>${
         key === 'status'
           ? status(item[key])
+          : key === 'kind'
+            ? esc(transactionLabel(item))
           : key === 'amount'
             ? money(item[key], item.asset)
             : key.endsWith('_at') || key === 'created_at'
@@ -316,6 +332,16 @@ function rows(items, cols) {
       }</td>`
     ).join('')}</tr>`)
   );
+}
+
+function transactionLabel(item) {
+  if (item.kind !== 'adjustment') return item.kind || 'transaction';
+
+  const delta = String(item.reference || '').match(/(?:^|;\s*)delta=([+-]?(?:\d+(?:\.\d*)?|\.\d+))/i);
+  if (!delta) return 'Balance update';
+
+  const amount = Number(delta[1]);
+  return amount > 0 ? 'Profit' : amount < 0 ? 'Balance decrease' : 'Balance update';
 }
 
 function placeholderImage(image, alt) {
@@ -1401,22 +1427,22 @@ async function memberPage() {
         ${marketNotice}
 
         <div class="stat-grid">
-          <article class="card stat-card">
+          <article class="card stat-card stat-card-balance">
             <p>Available balance</p>
             <strong>${money(balance, d.wallet?.asset || 'USDT')}</strong>
             <small>Current wallet ledger balance</small>
           </article>
-          <article class="card stat-card">
+          <article class="card stat-card stat-card-returns">
             <p>Recorded investment returns</p>
             <strong>${money(totalReturn, 'USDT')}</strong>
             <small>Sum of returns entered in your investment records</small>
           </article>
-          <article class="card stat-card">
+          <article class="card stat-card stat-card-pending">
             <p>Pending reviews</p>
             <strong>${pendingDeck}</strong>
             <small>Funding and investment requests</small>
           </article>
-          <article class="card stat-card">
+          <article class="card stat-card stat-card-contract">
             <p>Contract value</p>
             <strong>${money(contractValue, 'USDT')}</strong>
             <small>Principal plus recorded returns</small>
@@ -1567,7 +1593,7 @@ async function memberPage() {
               ${(d.transactions || []).slice(0, 5).map(item =>
                 `<li>
                   <div>
-                    <strong>${esc(item.kind || 'transaction')}</strong>
+                    <strong>${esc(transactionLabel(item))}</strong>
                     <span>${esc(statusText(item.status))}</span>
                   </div>
                   <small>${money(item.amount, item.asset || 'USDT')} · ${esc(date(item.created_at))}</small>
@@ -1739,7 +1765,7 @@ async function memberPage() {
         const addresses = addressData.items || [];
 
         const addressOptions = addresses.map(a => `
-          <option value="${esc(a.address || a.wallet_address || '')}"
+          <option value="${esc(a.id)}" data-address="${esc(a.wallet_address || a.address || '')}"
             data-network="${esc(a.network || 'TRC20')}"
             ${a.is_default ? 'selected' : ''}>
             ${esc(a.label || 'Saved address')} · ${esc(a.network || 'TRC20')} · ${esc((a.address || a.wallet_address || '').slice(0, 18))}
@@ -1778,7 +1804,7 @@ async function memberPage() {
 
               <div class="field">
                 <label>Saved destination address</label>
-                <select id="saved-withdraw-address">
+                <select id="saved-withdraw-address" aria-label="Choose a saved destination wallet">
                   <option value="">Enter an address manually</option>
                   ${addressOptions}
                 </select>
@@ -1872,12 +1898,12 @@ async function memberPage() {
 
         $('#saved-withdraw-address').addEventListener('change', e => {
           const option = e.currentTarget.selectedOptions[0];
-          if (!option || !option.value) return;
-
-          $('#withdraw-wallet-address').value = option.value;
-          const network = option.dataset.network;
-          if (network) $('#withdraw-network').value = network;
+          $('#withdraw-wallet-address').value = option?.dataset.address || '';
+          const network = option?.dataset.network;
+          if (option?.value && network) $('#withdraw-network').value = network;
         });
+
+        $('#saved-withdraw-address').dispatchEvent(new Event('change'));
 
         $('#save-withdraw-address-form').addEventListener('submit', async e => {
           e.preventDefault();
@@ -2123,6 +2149,10 @@ async function memberPage() {
 
         const profile = meData.profile || {};
         const documents = kycData.items || [];
+        const profileImageUrl = typeof profile.profile_image_url === 'string' && /^https:\/\//i.test(profile.profile_image_url)
+          ? profile.profile_image_url
+          : null;
+        const profileInitial = String(profile.display_name || profile.full_name || profile.email || 'U').trim().slice(0, 1).toUpperCase();
         const kycStatus = String(profile.kyc_status || 'not_submitted').toLowerCase();
 
         const kycLabels = {
@@ -2187,6 +2217,12 @@ async function memberPage() {
         <section class="card" style="margin-top:24px">
           <p class="eyebrow">PROFILE PHOTO</p>
           <h2>Personalise your account</h2>
+
+          <div id="profile-image-preview" class="profile-image-preview">
+            ${profileImageUrl
+              ? `<img src="${esc(profileImageUrl)}" alt="Your profile photo">`
+              : `<span aria-label="Profile photo placeholder">${esc(profileInitial)}</span>`}
+          </div>
 
           <form id="profile-image-form" class="form-grid">
             <div class="field">
@@ -2330,6 +2366,9 @@ async function memberPage() {
             });
 
             message.innerHTML = notice(result.message || 'Profile photo uploaded.', 'success');
+            if (typeof result.profile_image_url === 'string' && /^https:\/\//i.test(result.profile_image_url)) {
+              $('#profile-image-preview').innerHTML = `<img src="${esc(result.profile_image_url)}" alt="Your profile photo">`;
+            }
             form.reset();
           } catch (err) {
             message.innerHTML = notice(err.message || 'Could not upload the profile photo.', 'error');
@@ -2904,14 +2943,37 @@ async function memberPage() {
         <div id="form-message" aria-live="polite"></div>
       </form>
 
-      <h2 style="margin-top:32px">Existing categories</h2>
-      ${rows(d.items, [
-        ['name', 'Name'],
-        ['minimum_amount', 'Minimum'],
-        ['maximum_amount', 'Maximum'],
-        ['active', 'Active'],
-        ['created_at', 'Created']
-      ])}
+      <section class="plan-management-list" style="margin-top:32px">
+        <h2>Manage investment plans</h2>
+        ${d.items.length
+          ? d.items.map(plan => `<form class="card plan-edit-form" data-plan-id="${esc(plan.id)}">
+              <div class="plan-edit-fields">
+                <div class="field">
+                  <label>Plan name</label>
+                  <input name="name" value="${esc(plan.name || '')}" maxlength="100" required>
+                </div>
+                <div class="field">
+                  <label>Description</label>
+                  <textarea name="description" maxlength="1000">${esc(plan.description || '')}</textarea>
+                </div>
+                <div class="field">
+                  <label>Minimum amount</label>
+                  <input name="minimum_amount" type="number" min="0.01" step="0.01" value="${esc(plan.minimum_amount)}" required>
+                </div>
+                <div class="field">
+                  <label>Maximum amount (optional)</label>
+                  <input name="maximum_amount" type="number" min="0.01" step="0.01" value="${plan.maximum_amount == null ? '' : esc(plan.maximum_amount)}">
+                </div>
+                <label class="toggle-row"><input name="active" type="checkbox" ${plan.active ? 'checked' : ''}> Available to members</label>
+              </div>
+              <div class="actions plan-edit-actions">
+                <button class="btn btn-primary small-btn" type="submit">Save changes</button>
+                <button class="btn btn-outline small-btn" type="button" data-delete-plan="${esc(plan.id)}">Delete</button>
+              </div>
+              <div class="plan-edit-message" aria-live="polite"></div>
+            </form>`).join('')
+          : '<div class="empty-state">No investment plans have been created.</div>'}
+      </section>
 
       <section style="margin-top:32px">
         <h2>Investment requests awaiting review</h2>
@@ -3035,7 +3097,9 @@ async function memberPage() {
       $('#plan-form').addEventListener('submit', async e => {
         e.preventDefault();
 
-        const f = new FormData(e.currentTarget);
+        const form = e.currentTarget;
+        const f = new FormData(form);
+        const button = form.querySelector('button[type="submit"]');
         const minimum = Number(f.get('minimum_amount'));
         const maximum = f.get('maximum_amount') ? Number(f.get('maximum_amount')) : null;
 
@@ -3044,6 +3108,7 @@ async function memberPage() {
           return;
         }
 
+        button.disabled = true;
         try {
           await api('/api/admin/plans', {
             method: 'POST',
@@ -3056,10 +3121,69 @@ async function memberPage() {
             })
           });
 
-          $('#form-message').innerHTML = notice('Category created. Refresh to view it.', 'success');
+          $('#form-message').innerHTML = notice('Plan created.', 'success');
+          form.reset();
+          setTimeout(() => memberPage('admin-plans'), 500);
         } catch (err) {
           $('#form-message').innerHTML = notice(err.message, 'error');
+        } finally {
+          button.disabled = false;
         }
+      });
+
+      main.querySelectorAll('.plan-edit-form').forEach(form => {
+        form.addEventListener('submit', async event => {
+          event.preventDefault();
+          const fields = new FormData(form);
+          const minimum = Number(fields.get('minimum_amount'));
+          const maximum = fields.get('maximum_amount') ? Number(fields.get('maximum_amount')) : null;
+          const message = $('.plan-edit-message', form);
+          const button = form.querySelector('button[type="submit"]');
+
+          if (maximum !== null && maximum < minimum) {
+            message.innerHTML = notice('Maximum amount must be greater than or equal to minimum amount.', 'error');
+            return;
+          }
+
+          button.disabled = true;
+          try {
+            await api(`/api/admin/plans/${encodeURIComponent(form.dataset.planId)}`, {
+              method: 'PATCH',
+              body: JSON.stringify({
+                name: String(fields.get('name') || '').trim(),
+                description: String(fields.get('description') || '').trim(),
+                minimum_amount: minimum,
+                maximum_amount: maximum,
+                active: fields.has('active')
+              })
+            });
+            message.innerHTML = notice('Plan updated.', 'success');
+          } catch (error) {
+            message.innerHTML = notice(error.message || 'Plan could not be updated.', 'error');
+          } finally {
+            button.disabled = false;
+          }
+        });
+      });
+
+      main.querySelectorAll('[data-delete-plan]').forEach(button => {
+        button.addEventListener('click', async () => {
+          const form = button.closest('.plan-edit-form');
+          const message = $('.plan-edit-message', form);
+          if (!confirm('Remove this plan from member listings? Existing contracts remain unchanged.')) return;
+
+          button.disabled = true;
+          try {
+            const result = await api(`/api/admin/plans/${encodeURIComponent(button.dataset.deletePlan)}`, {
+              method: 'DELETE'
+            });
+            message.innerHTML = notice(result.message || 'Plan deleted from member listings.', 'success');
+            setTimeout(() => memberPage('admin-plans'), 500);
+          } catch (error) {
+            message.innerHTML = notice(error.message || 'Plan could not be deleted.', 'error');
+            button.disabled = false;
+          }
+        });
       });
     }
 
