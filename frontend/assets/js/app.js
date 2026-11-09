@@ -1460,7 +1460,7 @@ async function memberPage() {
         profile: 'My profile'
       }[page] || 'Member area');
 
-  app.innerHTML = `<section class="section ${page === 'dashboard' ? 'member-dashboard-shell' : admin ? 'admin-dashboard-shell' : 'member-page-shell'}">
+  app.innerHTML = `<section class="section portal-shell ${page === 'dashboard' ? 'member-dashboard-shell' : admin ? 'admin-dashboard-shell' : 'member-page-shell'}">
     <div class="container">
       <p class="eyebrow">${admin ? 'ADMINISTRATION' : 'MEMBER AREA'}</p>
       <h1>${title}</h1>

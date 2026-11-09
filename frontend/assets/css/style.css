@@ -2886,3 +2886,262 @@ h1, h2, h3, h4 {
 }
 
 /* END NORTHSTAR_PUBLIC_EXPERIENCE_V2 */
+
+/* Shared member and admin portal system */
+.portal-shell {
+  --portal-content-width: 1480px;
+  --portal-sidebar-width: 224px;
+  min-height: calc(100vh - 82px);
+  padding: 46px 0 78px;
+  background: var(--ns-bg);
+  color: var(--ns-text);
+}
+
+.portal-shell > .container {
+  width: min(calc(100% - 44px), var(--portal-content-width));
+}
+
+.portal-shell > .container > .eyebrow {
+  margin-bottom: 7px;
+  color: var(--ns-accent);
+}
+
+.portal-shell > .container > h1 {
+  margin: 0 0 25px;
+  color: var(--ns-text);
+  font: 700 2rem/1.15 var(--ns-font-display);
+}
+
+.member-dashboard-shell > .container > .eyebrow,
+.member-dashboard-shell > .container > h1 {
+  display: none;
+}
+
+.portal-shell .dashboard-layout {
+  grid-template-columns: var(--portal-sidebar-width) minmax(0, 1fr);
+  gap: 30px;
+  align-items: start;
+}
+
+.portal-shell .sidebar {
+  position: sticky;
+  top: 100px;
+  display: grid;
+  gap: 4px;
+  padding: 11px;
+  border: 1px solid var(--ns-border);
+  border-radius: var(--ns-radius-md);
+  background: var(--ns-surface);
+  box-shadow: var(--ns-shadow-sm);
+}
+
+.portal-shell .sidebar a {
+  min-width: 0;
+  padding: 11px 12px;
+  border-left: 2px solid transparent;
+  color: var(--ns-text-secondary);
+  font-size: .86rem;
+  transition: color var(--ns-transition), background-color var(--ns-transition), border-color var(--ns-transition);
+}
+
+.portal-shell .sidebar a:hover,
+.portal-shell .sidebar a.active {
+  border-left-color: var(--ns-accent);
+  background: var(--ns-surface-muted);
+  color: var(--ns-text);
+}
+
+.portal-shell .dashboard-main {
+  min-width: 0;
+  color: var(--ns-text);
+}
+
+.portal-shell .card,
+.portal-shell .panel,
+.portal-shell .form-card,
+.portal-shell .table-wrap {
+  border-color: var(--ns-border);
+  border-radius: var(--ns-radius-md);
+  background-color: var(--ns-surface);
+  color: var(--ns-text);
+  box-shadow: var(--ns-shadow-sm);
+}
+
+.portal-shell .card,
+.portal-shell .panel,
+.portal-shell .form-card {
+  padding: 22px;
+}
+
+.portal-shell .dashboard-main > .card .form-card {
+  max-width: none;
+  margin: 0;
+  padding: 16px 0 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.portal-shell .dashboard-main h2,
+.portal-shell .dashboard-main h3,
+.portal-shell .dashboard-main h4 {
+  color: var(--ns-text);
+}
+
+.portal-shell .dashboard-main .muted,
+.portal-shell .dashboard-main .form-note {
+  color: var(--ns-text-secondary);
+}
+
+.portal-shell .field label,
+.portal-shell .toggle-row {
+  color: var(--ns-text-secondary);
+}
+
+.portal-shell .field input,
+.portal-shell .field select,
+.portal-shell .field textarea {
+  min-width: 0;
+  border-color: var(--ns-border);
+  border-radius: var(--ns-radius-sm);
+  background: var(--ns-bg);
+  color: var(--ns-text);
+}
+
+.portal-shell .field input::placeholder,
+.portal-shell .field textarea::placeholder {
+  color: var(--ns-text-muted);
+}
+
+.portal-shell .table-wrap table {
+  background: var(--ns-surface);
+}
+
+.portal-shell th {
+  border-color: var(--ns-border);
+  background: var(--ns-surface-muted);
+  color: var(--ns-accent);
+}
+
+.portal-shell td {
+  border-color: var(--ns-border);
+  color: var(--ns-text-secondary);
+}
+
+.portal-shell .activity-list li,
+.portal-shell .ns-record-list li {
+  border-color: var(--ns-border);
+}
+
+.portal-shell .btn {
+  min-height: 40px;
+  border-radius: var(--ns-radius-sm);
+  font-size: .84rem;
+}
+
+.portal-shell .btn-primary {
+  border-color: var(--ns-accent);
+  background: var(--ns-accent);
+  color: #1c211b;
+}
+
+.portal-shell .btn-primary:hover {
+  border-color: var(--ns-accent-hover);
+  background: var(--ns-accent-hover);
+}
+
+.portal-shell .btn-outline {
+  border-color: var(--ns-border);
+  color: var(--ns-text);
+}
+
+.portal-shell .notice,
+.portal-shell .status {
+  border-color: var(--ns-border);
+  border-radius: var(--ns-radius-sm);
+  background: var(--ns-surface-muted);
+  color: var(--ns-text-secondary);
+}
+
+.portal-shell .badge {
+  border-color: var(--ns-border);
+  border-radius: 999px;
+}
+
+@media(max-width:1050px) {
+  .portal-shell .dashboard-layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .portal-shell .sidebar {
+    position: static;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media(max-width:760px) {
+  .portal-shell .dashboard-panels,
+  .portal-shell .ns-dashboard-columns,
+  .portal-shell .ns-account-overview {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media(max-width:580px) {
+  .portal-shell {
+    padding: 28px 0 54px;
+  }
+
+  .portal-shell > .container {
+    width: min(calc(100% - 28px), var(--portal-content-width));
+  }
+
+  .portal-shell .sidebar {
+    display: flex;
+    overflow-x: auto;
+    gap: 3px;
+    padding: 7px;
+  }
+
+  .portal-shell .sidebar a {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    padding: 9px 10px;
+    font-size: .76rem;
+  }
+
+  .portal-shell .dashboard-main > .card .form-card {
+    padding-inline: 0;
+  }
+}
+
+:root[data-theme="dark"] .portal-shell.member-dashboard-shell,
+:root[data-theme="dark"] .portal-shell.admin-dashboard-shell,
+:root[data-theme="dark"] .portal-shell.member-page-shell {
+  background: var(--ns-bg);
+  color: var(--ns-text);
+}
+
+:root[data-theme="dark"] .portal-shell .sidebar {
+  border-color: var(--ns-border);
+  background: var(--ns-surface);
+  box-shadow: var(--ns-shadow-sm);
+}
+
+:root[data-theme="dark"] .portal-shell.member-dashboard-shell .sidebar a,
+:root[data-theme="dark"] .portal-shell.admin-dashboard-shell .sidebar a,
+:root[data-theme="dark"] .portal-shell.member-page-shell .sidebar a {
+  color: var(--ns-text-secondary);
+}
+
+:root[data-theme="dark"] .portal-shell.member-dashboard-shell .sidebar a:hover,
+:root[data-theme="dark"] .portal-shell.member-dashboard-shell .sidebar a.active,
+:root[data-theme="dark"] .portal-shell.admin-dashboard-shell .sidebar a:hover,
+:root[data-theme="dark"] .portal-shell.admin-dashboard-shell .sidebar a.active,
+:root[data-theme="dark"] .portal-shell.member-page-shell .sidebar a:hover,
+:root[data-theme="dark"] .portal-shell.member-page-shell .sidebar a.active {
+  border-left-color: var(--ns-accent);
+  background: var(--ns-surface-muted);
+  color: var(--ns-text);
+}

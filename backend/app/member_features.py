@@ -1058,7 +1058,7 @@ def member_referral_summary(
 ):
 
     profile = (
-        adminndb.table("profiles")
+        admin_db.table("profiles")
         .select("referral_code")
         .eq("id", user["id"])
         .maybe_single()
