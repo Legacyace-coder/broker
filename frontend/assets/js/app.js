@@ -529,7 +529,7 @@ function initHeroCarousel(root) {
 
       counter.textContent = `${current} / ${total}`;
     }
-  }, 2000);
+  }, 10000);
 }
 function home() {
   return `<section class="hero hero-home">
@@ -537,7 +537,7 @@ function home() {
   <img
     class="hero-home-image hero-home-slide is-active"
     data-hero-slide
-    src="assets/images/company team hero background.jpg"
+    src="assets/images/company-team1 .jpg"
     alt=""
     fetchpriority="high"
     decoding="async"
@@ -545,7 +545,7 @@ function home() {
   <img
     class="hero-home-image hero-home-slide"
     data-hero-slide
-    src="assets/images/digital assets.jpg"
+    src="assets/images/blockchain.jpg"
     alt=""
     loading="eager"
     decoding="async"
@@ -553,7 +553,7 @@ function home() {
   <img
     class="hero-home-image hero-home-slide"
     data-hero-slide
-    src="assets/images/real estate.jpg"
+    src="assets/images/real estate page hero background.jpg"
     alt=""
     loading="eager"
     decoding="async"
@@ -561,7 +561,23 @@ function home() {
   <img
     class="hero-home-image hero-home-slide"
     data-hero-slide
-    src="assets/images/agriculture.jpg"
+    src="assets/images/agriculture page hero background.jpg"
+    alt=""
+    loading="eager"
+    decoding="async"
+  >
+  <img
+    class="hero-home-image hero-home-slide"
+    data-hero-slide
+    src="assets/images/RESPONSIBLE BUSINESS background.jpg"
+    alt=""
+    loading="eager"
+    decoding="async"
+  >
+  <img
+    class="hero-home-image hero-home-slide"
+    data-hero-slide
+    src="assets/images/custody and security background.jpg"
     alt=""
     loading="eager"
     decoding="async"
@@ -576,7 +592,7 @@ function home() {
         <a class="btn btn-primary" href="pages/digital-assets.html">Explore our research</a>
         <a class="btn btn-outline" href="pages/about.html">Our approach <span aria-hidden="true">↗</span></a>
       </div>
-      <div class="hero-home-foot"><span>Perspective before participation</span><span data-hero-slide-counter>01 / 04</span></div>
+      <div class="hero-home-foot"><span>Perspective before participation</span><span data-hero-slide-counter>01 / 06</span></div>
     </div>
   </section>
 
