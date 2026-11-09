@@ -1,4 +1,4 @@
-﻿const cfg = window.NORTHSTAR_CONFIG || {};
+const cfg = window.NORTHSTAR_CONFIG || {};
 const configured = cfg.SUPABASE_URL && !cfg.SUPABASE_URL.includes('YOUR_PROJECT') && cfg.SUPABASE_ANON_KEY && !cfg.SUPABASE_ANON_KEY.includes('YOUR_PUBLIC');
 let supabase = null;
 let supabaseClientPromise = null;
@@ -68,45 +68,68 @@ const root = location.pathname.includes('/pages/') ||
   : '';
 
 
-/* NORTHSTAR_THEME_SYSTEM */
+
+/* NORTHSTAR_FOUNDATION_V1 */
 const THEME_KEY = 'northstar-theme';
 
-function getPreferredTheme() {
+function getThemePreference() {
   const saved = localStorage.getItem(THEME_KEY);
-  if (saved === 'light' || saved === 'dark') return saved;
+  return ['light', 'dark', 'system'].includes(saved) ? saved : 'system';
+}
+
+function resolveTheme(preference) {
+  if (preference === 'light' || preference === 'dark') return preference;
   return window.matchMedia('(prefers-color-scheme: light)').matches
     ? 'light'
     : 'dark';
 }
 
-function applyTheme(theme) {
-  const selected = theme === 'light' ? 'light' : 'dark';
+function applyTheme(preference = getThemePreference()) {
+  const selected = resolveTheme(preference);
+
   document.documentElement.dataset.theme = selected;
+  document.documentElement.dataset.themePreference = preference;
   document.documentElement.style.colorScheme = selected;
 
   const toggle = document.querySelector('[data-theme-toggle]');
+
   if (toggle) {
-    const isDark = selected === 'dark';
-    toggle.setAttribute('aria-pressed', String(isDark));
+    const labels = {
+      system: 'System',
+      light: 'Light',
+      dark: 'Dark'
+    };
+
+    toggle.innerHTML = `
+      <span class="theme-toggle-icon" aria-hidden="true">
+        ${preference === 'light' ? '?' : preference === 'dark' ? '?' : '?'}
+      </span>
+      <span>Theme: ${labels[preference]}</span>
+    `;
+
     toggle.setAttribute(
       'aria-label',
-      isDark ? 'Switch to light mode' : 'Switch to dark mode'
+      `Theme preference: ${labels[preference]}. Activate to change theme.`
     );
-    toggle.innerHTML = isDark
-      ? '<span class="theme-toggle-icon" aria-hidden="true">☀️</span><span>Light mode</span>'
-      : '<span class="theme-toggle-icon" aria-hidden="true">🌙</span><span>Dark mode</span>';
+    toggle.setAttribute('aria-pressed', String(preference !== 'system'));
   }
 }
 
 function initTheme() {
-  applyTheme(getPreferredTheme());
+  applyTheme(getThemePreference());
 
-  window.matchMedia('(prefers-color-scheme: light)')
-    .addEventListener('change', event => {
-      if (!localStorage.getItem(THEME_KEY)) {
-        applyTheme(event.matches ? 'light' : 'dark');
-      }
-    });
+  const media = window.matchMedia('(prefers-color-scheme: light)');
+  const updateSystemTheme = () => {
+    if (getThemePreference() === 'system') {
+      applyTheme('system');
+    }
+  };
+
+  if (media.addEventListener) {
+    media.addEventListener('change', updateSystemTheme);
+  } else {
+    media.addListener(updateSystemTheme);
+  }
 }
 
 function bindThemeToggle() {
@@ -114,16 +137,21 @@ function bindThemeToggle() {
   if (!toggle || toggle.dataset.bound === 'true') return;
 
   toggle.dataset.bound = 'true';
+
   toggle.addEventListener('click', () => {
-    const next = document.documentElement.dataset.theme === 'dark'
-      ? 'light'
-      : 'dark';
+    const current = getThemePreference();
+    const next = {
+      system: 'light',
+      light: 'dark',
+      dark: 'system'
+    }[current];
 
     localStorage.setItem(THEME_KEY, next);
     applyTheme(next);
   });
 }
-/* END NORTHSTAR_THEME_SYSTEM */
+/* END NORTHSTAR_FOUNDATION_V1 */
+
 
 function nav() {
   const publicItems = [
@@ -1503,217 +1531,244 @@ async function memberPage() {
         }).format(Number(value));
       const statusText = v => String(v || 'pending').replace(/_/g, ' ');
 
-      main.innerHTML = `<div class="dashboard-summary">
-        <div class="dashboard-topbar">
-          <div>
-            <p class="eyebrow">PORTFOLIO</p>
-            <h2>Welcome back, ${esc(displayName)}</h2>
-            <p>Your account overview and investment activity.</p>
-          </div>
-          <span class="chip">${esc(kycLabel)}</span>
-        </div>
-
-        <div class="stat-grid">
-          <article class="card stat-card stat-card-balance">
-            <p>Available balance</p>
-            <strong>${money(balance, d.wallet?.asset || 'USDT')}</strong>
-            <small>Current wallet ledger balance</small>
-          </article>
-          <article class="card stat-card stat-card-returns">
-            <p>Recorded investment returns</p>
-            <strong>${money(totalReturn, 'USDT')}</strong>
-            <small>Sum of returns entered in your investment records</small>
-          </article>
-          <article class="card stat-card stat-card-pending">
-            <p>Pending reviews</p>
-            <strong>${pendingDeck}</strong>
-            <small>Funding and investment requests</small>
-          </article>
-          <article class="card stat-card stat-card-contract">
-            <p>Contract value</p>
-            <strong>${money(contractValue, 'USDT')}</strong>
-            <small>Principal plus recorded returns</small>
-          </article>
-        </div>
-
-        <section class="panel dashboard-referral-summary">
-          <div class="dashboard-topbar">
+      main.innerHTML = `
+        <div class="ns-dashboard">
+          <header class="ns-dashboard-heading">
             <div>
-              <p class="eyebrow">REFERRALS</p>
-              <h3>Your invite details</h3>
+              <p class="eyebrow">YOUR INVESTMENT ACCOUNT</p>
+              <h2>Good to have you back, ${esc(displayName.split(' ')[0])}.</h2>
+              <p>A clear view of your capital, commitments and account activity.</p>
             </div>
-            <a href="partner-program.html">View referrals</a>
+            <div class="ns-account-status">
+              <span class="ns-status-dot"></span>
+              <span>${esc(kycLabel)}</span>
+              <a href="profile.html" aria-label="Manage account verification">Manage</a>
+            </div>
+          </header>
+
+          <section class="ns-account-overview">
+            <div class="ns-account-primary">
+              <div class="ns-account-label">
+                <span>AVAILABLE BALANCE</span>
+                <span class="ns-account-reference">WALLET LEDGER</span>
+              </div>
+              <strong>${money(balance, d.wallet?.asset || 'USDT')}</strong>
+              <p>Funds currently recorded in your account wallet.</p>
+              <div class="ns-account-actions">
+                <a class="btn btn-primary" href="new-deposit.html">Add funds <span aria-hidden="true">↗</span></a>
+                <a class="ns-text-action" href="withdrawals.html">Withdrawal options <span aria-hidden="true">→</span></a>
+              </div>
+            </div>
+            <div class="ns-account-secondary">
+              <div class="ns-secondary-heading">
+                <span>INVESTMENT POSITION</span>
+                <span class="ns-secondary-mark">NC / 01</span>
+              </div>
+              <div class="ns-position-line">
+                <span>Contract value</span>
+                <strong>${money(contractValue, 'USDT')}</strong>
+              </div>
+              <div class="ns-position-line">
+                <span>Recorded returns</span>
+                <strong>${money(totalReturn, 'USDT')}</strong>
+              </div>
+              <div class="ns-position-line">
+                <span>Active contracts</span>
+                <strong>${contracts.filter(c => c.status === 'active').length}</strong>
+              </div>
+              <div class="ns-position-line">
+                <span>Items awaiting review</span>
+                <strong>${pendingDeck}</strong>
+              </div>
+              <a class="ns-secondary-link" href="investments.html">View investment details <span aria-hidden="true">↗</span></a>
+            </div>
+          </section>
+
+          <section class="ns-dashboard-section ns-market-section" aria-label="Market reference">
+            <div class="ns-section-heading">
+              <div>
+                <p class="eyebrow">MARKET REFERENCE</p>
+                <h3>Digital asset prices</h3>
+              </div>
+              <span class="ns-section-note">Indicative USD pricing</span>
+            </div>
+            <div class="ns-market-grid ticker-strip" id="market-ticker">
+              <div class="loading">Loading reference prices…</div>
+            </div>
+            <div id="market-notice" aria-live="polite"></div>
+          </section>
+
+          <div class="ns-dashboard-columns">
+            <section class="ns-dashboard-section ns-contract-section">
+              <div class="ns-section-heading">
+                <div>
+                  <p class="eyebrow">YOUR PORTFOLIO</p>
+                  <h3>Investment commitments</h3>
+                </div>
+                <a href="investments.html">Explore plans ↗</a>
+              </div>
+              ${contracts.length
+                ? `<div class="ns-contract-list">
+                    ${contracts.slice(0, 5).map(c => `
+                      <article class="ns-contract-row">
+                        <div class="ns-contract-symbol" aria-hidden="true">NC</div>
+                        <div class="ns-contract-name">
+                          <strong>${esc(c.plans?.name || 'Investment contract')}</strong>
+                          <span>${esc(statusText(c.status))}</span>
+                        </div>
+                        <div class="ns-contract-amount">
+                          <strong>${money(c.current_value ?? c.principal ?? 0, c.asset || 'USDT')}</strong>
+                          <span>Current value</span>
+                        </div>
+                      </article>
+                    `).join('')}
+                  </div>`
+                : `<div class="ns-empty-state">
+                    <span class="ns-empty-index">01 / PORTFOLIO</span>
+                    <h4>Your investment portfolio starts here.</h4>
+                    <p>Once an investment request is reviewed and approved, its contract will appear in this section.</p>
+                    <a href="investments.html">Review available plans ↗</a>
+                  </div>`}
+              <div class="ns-contract-foot">
+                <span>Recorded principal</span>
+                <strong>${money(contracts.reduce((sum, c) => sum + Number(c.principal || 0), 0), 'USDT')}</strong>
+              </div>
+            </section>
+
+            <aside class="ns-dashboard-section ns-verification-section">
+              <div class="ns-section-heading">
+                <div>
+                  <p class="eyebrow">ACCOUNT ASSURANCE</p>
+                  <h3>Verification</h3>
+                </div>
+                <span class="ns-verification-index">02</span>
+              </div>
+              <div class="ns-verification-state">
+                <span class="ns-verification-label">IDENTITY STATUS</span>
+                <strong>${esc(kycLabel)}</strong>
+                <p>${esc(kycMessage)}</p>
+              </div>
+              <a class="ns-outline-link" href="profile.html">View profile and documents <span aria-hidden="true">↗</span></a>
+              <div class="ns-verification-foot">
+                <span>Account security</span>
+                <span>Profile settings</span>
+              </div>
+            </aside>
           </div>
-          <div id="dashboard-referral-content"><p class="muted">Loading referral details…</p></div>
-        </section>
 
-        <section class="market-prices-section" aria-label="Live market prices">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">MARKET REFERENCE</p>
-              <h3>Live prices</h3>
-            </div>
+          <div class="ns-dashboard-columns ns-activity-columns">
+            <section class="ns-dashboard-section">
+              <div class="ns-section-heading">
+                <div>
+                  <p class="eyebrow">INVESTMENT REQUESTS</p>
+                  <h3>Plan applications</h3>
+                </div>
+                <a href="investments.html">View all ↗</a>
+              </div>
+              ${requests.length
+                ? `<ul class="ns-record-list">
+                    ${requests.slice(0, 4).map(item => `
+                      <li>
+                        <div class="ns-record-main">
+                          <strong>${esc(item.plans?.name || 'Investment plan')}</strong>
+                          <span>${esc(date(item.created_at))}</span>
+                        </div>
+                        <div class="ns-record-meta">
+                          <strong>${money(item.requested_amount, item.asset || 'USDT')}</strong>
+                          ${status(item.status)}
+                        </div>
+                      </li>
+                    `).join('')}
+                  </ul>`
+                : '<div class="ns-empty-compact">No investment applications have been submitted.</div>'}
+            </section>
+
+            <section class="ns-dashboard-section">
+              <div class="ns-section-heading">
+                <div>
+                  <p class="eyebrow">FUNDING ACTIVITY</p>
+                  <h3>Recent deposits</h3>
+                </div>
+                <a href="deposit-history.html">View history ↗</a>
+              </div>
+              ${(d.deposits || []).length
+                ? `<ul class="ns-record-list">
+                    ${d.deposits.slice(0, 4).map(item => `
+                      <li>
+                        <div class="ns-record-main">
+                          <strong>${money(item.amount, item.asset || 'USDT')}</strong>
+                          <span>${esc(date(item.created_at))}</span>
+                        </div>
+                        <div class="ns-record-meta">${status(item.status)}</div>
+                      </li>
+                    `).join('')}
+                  </ul>`
+                : '<div class="ns-empty-compact">No recent deposit requests.</div>'}
+            </section>
           </div>
-          <div class="ticker-strip" id="market-ticker">
-            <div class="loading">Loading reference prices…</div>
+
+          <div class="ns-dashboard-columns ns-activity-columns">
+            <section class="ns-dashboard-section">
+              <div class="ns-section-heading">
+                <div>
+                  <p class="eyebrow">WITHDRAWAL ACTIVITY</p>
+                  <h3>Recent withdrawals</h3>
+                </div>
+                <a href="withdrawals.html">View requests ↗</a>
+              </div>
+              ${(d.withdrawals || []).length
+                ? `<ul class="ns-record-list">
+                    ${d.withdrawals.slice(0, 4).map(item => `
+                      <li>
+                        <div class="ns-record-main">
+                          <strong>${money(item.amount, item.asset || 'USDT')}</strong>
+                          <span>${esc(date(item.created_at))}</span>
+                        </div>
+                        <div class="ns-record-meta">${status(item.status)}</div>
+                      </li>
+                    `).join('')}
+                  </ul>`
+                : '<div class="ns-empty-compact">No recent withdrawal requests.</div>'}
+            </section>
+
+            <section class="ns-dashboard-section">
+              <div class="ns-section-heading">
+                <div>
+                  <p class="eyebrow">ACCOUNT HISTORY</p>
+                  <h3>Recent transactions</h3>
+                </div>
+                <a href="transactions.html">Full history ↗</a>
+              </div>
+              ${(d.transactions || []).length
+                ? `<ul class="ns-record-list">
+                    ${d.transactions.slice(0, 5).map(item => `
+                      <li>
+                        <div class="ns-record-main">
+                          <strong>${esc(transactionLabel(item))}</strong>
+                          <span>${esc(date(item.created_at))}</span>
+                        </div>
+                        <div class="ns-record-meta">
+                          <strong>${money(item.amount, item.asset || 'USDT')}</strong>
+                          ${status(item.status)}
+                        </div>
+                      </li>
+                    `).join('')}
+                  </ul>`
+                : '<div class="ns-empty-compact">Your account transactions will appear here.</div>'}
+            </section>
           </div>
-          <div id="market-notice" aria-live="polite"></div>
-        </section>
 
-        <div class="dashboard-panels">
-          <section class="panel canvas-panel">
-            <div class="panel-header">
+          <section class="ns-dashboard-section ns-referral-section">
+            <div class="ns-section-heading">
               <div>
-                <p class="eyebrow">PERFORMANCE</p>
-                <h3>Investment overview</h3>
+                <p class="eyebrow">PRIVATE NETWORK</p>
+                <h3>Your referral details</h3>
               </div>
+              <a href="partner-program.html">Referral programme ↗</a>
             </div>
-            ${contracts.length
-              ? `<div class="stat-grid">
-                  <article class="card stat-card">
-                    <p>Active contracts</p>
-                    <strong>${contracts.filter(c => c.status === 'active').length}</strong>
-                  </article>
-                  <article class="card stat-card">
-                    <p>Total principal</p>
-                    <strong>${money(contracts.reduce((sum, c) => sum + Number(c.principal || 0), 0), 'USDT')}</strong>
-                  </article>
-                </div>`
-              : '<div class="empty-state">No investment contracts yet. Submit a plan request to get started; an administrator must approve it before it becomes a contract.</div>'}
+            <div id="dashboard-referral-content"><p class="muted">Loading referral details…</p></div>
           </section>
-
-          <aside class="panel">
-            <div class="panel-header">
-              <div>
-                <p class="eyebrow">VERIFICATION</p>
-                <h3>KYC status</h3>
-              </div>
-            </div>
-            <div class="tier-box">
-              <strong>${esc(kycLabel)}</strong>
-              <span>${esc(kycMessage)}</span>
-            </div>
-            <a class="btn btn-outline" href="profile.html">Manage profile & documents</a>
-          </aside>
-        </div>
-
-        <div class="dashboard-panels">
-          <section class="panel">
-            <div class="panel-header">
-              <div>
-                <p class="eyebrow">INVESTMENT REQUESTS</p>
-                <h3>Your plan requests</h3>
-              </div>
-              <a href="investments.html">View plans</a>
-            </div>
-            ${requests.length
-              ? `<ul class="activity-list">
-                  ${requests.slice(0, 4).map(item =>
-                    `<li>
-                      <div>
-                        <strong>${esc(item.plans?.name || 'Investment plan')}</strong>
-                        <span>${esc(statusText(item.status))}</span>
-                      </div>
-                      <small>${money(item.requested_amount, item.asset || 'USDT')} · ${esc(date(item.created_at))}</small>
-                    </li>`
-                  ).join('')}
-                </ul>`
-              : '<div class="empty-state">You have not submitted an investment plan request.</div>'}
-          </section>
-
-          <section class="panel">
-            <div class="panel-header">
-              <div>
-                <p class="eyebrow">CONTRACTS</p>
-                <h3>Approved investments</h3>
-              </div>
-            </div>
-            ${contracts.length
-              ? `<ul class="activity-list">
-                  ${contracts.slice(0, 4).map(c =>
-                    `<li>
-                      <div>
-                        <strong>${esc(c.plans?.name || 'Investment contract')}</strong>
-                        <span>${esc(statusText(c.status))}</span>
-                      </div>
-                      <small>Principal ${money(c.principal, c.asset || 'USDT')} · Returns ${money(c.total_return || 0, c.asset || 'USDT')}</small>
-                    </li>`
-                  ).join('')}
-                </ul>`
-              : '<div class="empty-state">Approved contracts will appear here.</div>'}
-          </section>
-        </div>
-
-        <div class="dashboard-panels">
-          <section class="panel">
-            <div class="panel-header">
-              <div>
-                <p class="eyebrow">DEPOSITS</p>
-                <h3>Recent funding</h3>
-              </div>
-              <a href="new-deposit.html">Review</a>
-            </div>
-            ${(d.deposits || []).length
-              ? `<ul class="activity-list">
-                  ${d.deposits.slice(0, 3).map(item =>
-                    `<li>
-                      <div>
-                        <strong>${money(item.amount, item.asset || 'USDT')}</strong>
-                        <span>${esc(statusText(item.status))}</span>
-                      </div>
-                      <small>${esc(date(item.created_at))}</small>
-                    </li>`
-                  ).join('')}
-                </ul>`
-              : '<div class="empty-state">No recent deposits yet.</div>'}
-          </section>
-
-          <section class="panel">
-            <div class="panel-header">
-              <div>
-                <p class="eyebrow">WITHDRAWALS</p>
-                <h3>Request status</h3>
-              </div>
-              <a href="withdrawals.html">Open</a>
-            </div>
-            ${(d.withdrawals || []).length
-              ? `<ul class="activity-list">
-                  ${d.withdrawals.slice(0, 3).map(item =>
-                    `<li>
-                      <div>
-                        <strong>${money(item.amount, item.asset || 'USDT')}</strong>
-                        <span>${esc(statusText(item.status))}</span>
-                      </div>
-                      <small>${esc(date(item.created_at))}</small>
-                    </li>`
-                  ).join('')}
-                </ul>`
-              : '<div class="empty-state">No recent withdrawals.</div>'}
-          </section>
-        </div>
-
-        <div class="dashboard-panels">
-          <section class="panel">
-            <div class="panel-header">
-              <div>
-                <p class="eyebrow">ACTIVITY</p>
-                <h3>Recent transactions</h3>
-              </div>
-            </div>
-            <ul class="activity-list">
-              ${(d.transactions || []).slice(0, 5).map(item =>
-                `<li>
-                  <div>
-                    <strong>${esc(transactionLabel(item))}</strong>
-                    <span>${esc(statusText(item.status))}</span>
-                  </div>
-                  <small>${money(item.amount, item.asset || 'USDT')} · ${esc(date(item.created_at))}</small>
-                </li>`
-              ).join('') || '<li><div><strong>No recent activity</strong></div></li>'}
-            </ul>
-          </section>
-        </div>
-      </div>`;
+        </div>`;
 
       referralPromise.then(referral => {
         const target = $('#dashboard-referral-content', main);
