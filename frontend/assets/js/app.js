@@ -205,6 +205,61 @@ function loadOptionalFonts() {
   document.head.append(stylesheet);
 }
 
+function bindPageTransitions() {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  document.body.classList.add('page-entering');
+  document.addEventListener('click', event => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+    const link = event.target.closest('a[href]');
+    if (!link || link.target || link.hasAttribute('download') || link.hasAttribute('data-logout')) return;
+
+    const destination = new URL(link.href, location.href);
+    if (destination.origin !== location.origin) return;
+    if (destination.pathname === location.pathname && destination.search === location.search) return;
+
+    event.preventDefault();
+    document.body.classList.remove('page-entering');
+    document.body.classList.add('page-leaving');
+    window.setTimeout(() => { location.href = destination.href; }, 190);
+  });
+}
+
+function initScrollReveals(root) {
+  const targets = root.querySelectorAll([
+    '.page-hero',
+    '.home-sector-row',
+    '.home-method-image',
+    '.home-method-copy',
+    '.home-principles-list > div',
+    '.home-contact-content',
+    '.image-feature',
+    '.card-with-image',
+    '.sector-image',
+    '.dashboard-referral-summary',
+    '.dashboard-panels > *'
+  ].join(','));
+
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !('IntersectionObserver' in window)) {
+    return;
+  }
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      entry.target.classList.add('is-visible');
+      observer.unobserve(entry.target);
+    });
+  }, { threshold: 0.14, rootMargin: '0px 0px -36px 0px' });
+
+  targets.forEach((element, index) => {
+    element.classList.add('scroll-reveal');
+    element.style.setProperty('--reveal-delay', `${Math.min(index % 5, 4) * 75}ms`);
+    observer.observe(element);
+  });
+}
+
 function notice(msg, kind = '') {
   return `<div class="status ${kind}" role="status">${esc(displayText(msg))}</div>`;
 }
@@ -412,93 +467,83 @@ function placeholderImage(image, alt) {
 }
 
 function home() {
-  return `<section class="hero">
-    <div class="container hero-content">
-      <p class="eyebrow">NORTHSTAR CAPITAL <span class="hero-label">RESEARCH-LED PERSPECTIVE</span></p>
-      <h1>Navigate change<br><span>with clarity.</span></h1>
-      <p>Explore digital assets, real estate and agriculture with a considered view of opportunity, uncertainty and risk.</p>
+  return `<section class="hero hero-home">
+    <img class="hero-home-image" src="assets/images/company team hero background.jpg" alt="Researchers working together" fetchpriority="high">
+    <div class="container hero-home-content">
+      <p class="hero-home-kicker"><span>Independent perspective</span><span>Digital assets · Property · Agriculture</span></p>
+      <h1>Northstar<br><span>Capital</span></h1>
+      <p class="hero-home-intro">Research for decisions in changing markets.</p>
+      <p class="hero-home-copy">A considered view of digital assets, real estate and agriculture, grounded in context, due diligence and a clear-eyed understanding of risk.</p>
       <div class="hero-actions">
-        <a class="btn btn-primary" href="pages/plans.html">Explore our services</a>
-        <a class="btn btn-outline" href="pages/about.html">Our approach</a>
+        <a class="btn btn-primary" href="pages/digital-assets.html">Explore our research</a>
+        <a class="btn btn-outline" href="pages/about.html">Our approach <span aria-hidden="true">↗</span></a>
       </div>
-      <div class="hero-proof">
-        <span>Independent thinking</span>
-        <span>Clear communication</span>
-        <span>Risk-aware research</span>
-      </div>
-    </div>
-    <div class="hero-orbit" aria-hidden="true">
-      <div class="orbit orbit-one"></div>
-      <div class="orbit orbit-two"></div>
-      <div class="orbit-core">N<span>★</span></div>
+      <div class="hero-home-foot"><span>Perspective before participation</span><span>01 / 03</span></div>
     </div>
   </section>
 
-  <section class="section">
+  <section class="home-sectors section">
     <div class="container">
-      <div class="section-heading">
-        <p class="eyebrow">AREAS OF FOCUS</p>
-        <h2>Different markets.<br>One thoughtful approach.</h2>
-        <p>Understand the underlying landscape before making a decision.</p>
+      <div class="home-section-heading">
+        <div><p class="eyebrow">Research areas</p><h2>Three markets.<br>One measured lens.</h2></div>
+        <p>We look beyond the headline to understand structures, constraints and the forces that shape long-term outcomes.</p>
       </div>
-      <div class="grid grid-3">
-        ${[
-          ['01', 'Digital assets', 'Blockchain infrastructure, market structure and custody risk.', 'pages/digital-assets.html'],
-          ['02', 'Real estate', 'Property fundamentals, ownership, liquidity and due diligence.', 'pages/real-estate.html'],
-          ['03', 'Agriculture', 'Production, processing, supply chains and market access.', 'pages/agriculture.html']
-        ].map(([n, title, copy, href]) =>
-          `<a class="focus-card" href="${href}">
-            <span class="focus-index">${n} / RESEARCH</span>
-            <h3>${title}</h3>
-            <p>${copy}</p>
-            <span class="focus-arrow" aria-hidden="true">↗</span>
-          </a>`
-        ).join('')}
+      <div class="home-sector-list">
+        <a class="home-sector-row" href="pages/digital-assets.html">
+          <span class="home-sector-number">01</span>
+          <img src="assets/images/digital assets.jpg" alt="Digital asset market infrastructure" loading="lazy">
+          <span class="home-sector-copy"><span class="eyebrow">Infrastructure / custody / markets</span><strong>Digital assets</strong><span>Blockchain systems, custody models and market structure.</span></span>
+          <span class="home-sector-arrow" aria-hidden="true">↗</span>
+        </a>
+        <a class="home-sector-row" href="pages/real-estate.html">
+          <span class="home-sector-number">02</span>
+          <img src="assets/images/real estate.jpg" alt="Real estate and property" loading="lazy">
+          <span class="home-sector-copy"><span class="eyebrow">Property / ownership / liquidity</span><strong>Real estate</strong><span>Property fundamentals, ownership structures and due diligence.</span></span>
+          <span class="home-sector-arrow" aria-hidden="true">↗</span>
+        </a>
+        <a class="home-sector-row" href="pages/agriculture.html">
+          <span class="home-sector-number">03</span>
+          <img src="assets/images/agriculture.jpg" alt="Agriculture and production" loading="lazy">
+          <span class="home-sector-copy"><span class="eyebrow">Production / supply chains / land</span><strong>Agriculture</strong><span>Production systems, processing capacity and routes to market.</span></span>
+          <span class="home-sector-arrow" aria-hidden="true">↗</span>
+        </a>
       </div>
     </div>
   </section>
 
-  <section class="section section-alt">
-    <div class="container grid grid-2">
-      <div>
-        <p class="eyebrow">A CLEARER VIEW</p>
+  <section class="home-method section section-alt">
+    <div class="container home-method-layout">
+      <figure class="home-method-image"><img src="assets/images/research cta image.jpg" alt="Research materials arranged for review" loading="lazy"></figure>
+      <div class="home-method-copy">
+        <p class="eyebrow">How we think</p>
         <h2>Context before conviction.</h2>
-        <p>Markets move. Information changes. We focus on explaining the factors that shape decisions—not on predictions or promises.</p>
-        <a class="text-link" href="pages/about.html">Learn how we think <span aria-hidden="true">→</span></a>
-      </div>
-      <div class="market-note">
-        <span class="market-note-label">NORTHSTAR / MARKET NOTE</span>
-        <div class="market-note-rule"></div>
-        <strong>Clarity is a process.</strong>
-        <p>Research, understand trade-offs, and make decisions that reflect your circumstances.</p>
-        <span class="market-note-foot">GENERAL INFORMATION ONLY · NOT INVESTMENT ADVICE</span>
+        <p>Markets move. Information changes. We focus on explaining the factors that shape a decision, not on predictions or promises.</p>
+        <a class="text-link" href="pages/about.html">Read our approach <span aria-hidden="true">→</span></a>
+        <p class="home-method-note">General information only. Not investment advice.</p>
       </div>
     </div>
   </section>
 
-  <section class="section">
+  <section class="home-principles-band section">
     <div class="container">
-      <div class="section-heading">
-        <p class="eyebrow">OUR PRINCIPLES</p>
-        <h2>Designed around trust.</h2>
+      <div class="home-section-heading">
+        <div><p class="eyebrow">Our standards</p><h2>Clarity is a practice.</h2></div>
+        <a class="text-link" href="pages/corporate-responsibility.html">How we work <span aria-hidden="true">→</span></a>
       </div>
-      ${cards([
-        ['Research & due diligence', 'Evaluate relevant information before making decisions.'],
-        ['Security & accountability', 'Protect accounts, document actions and restrict access.'],
-        ['Risk awareness', 'Communicate uncertainty, costs and limitations clearly.']
-      ])}
+      <div class="home-principles-list">
+        <div><span>01</span><h3>Evidence first</h3><p>Examine relevant information before framing an opportunity.</p></div>
+        <div><span>02</span><h3>Risk in view</h3><p>Make uncertainty, constraints and downside part of the discussion.</p></div>
+        <div><span>03</span><h3>Accountability</h3><p>Document decisions and communicate with care.</p></div>
+      </div>
     </div>
   </section>
 
-  <section class="section cta-section">
-    <div class="container">
-      <p class="eyebrow">START A CONVERSATION</p>
-      <h2>Make room for better questions.</h2>
-      <p>Talk to our team or create an account to access the member portal.</p>
-      <div class="hero-actions">
-        <a class="btn btn-primary" href="pages/contact.html">Contact us</a>
-        <a class="btn btn-outline" href="pages/register.html">Create account</a>
-      </div>
+  <section class="home-contact-band">
+    <div class="container home-contact-content">
+      <p class="eyebrow">Northstar / Conversation</p>
+      <h2>Start with a better question.</h2>
+      <p>Speak with our team about our research and areas of focus.</p>
+      <a class="btn btn-primary" href="pages/contact.html">Contact Northstar <span aria-hidden="true">↗</span></a>
     </div>
   </section>`;
 }
@@ -3606,6 +3651,7 @@ function bindPublic() {
 async function init() {
   initTheme();
   loadOptionalFonts();
+  bindPageTransitions();
   nav();
   footer();
 
@@ -3626,6 +3672,7 @@ async function init() {
   if (publicContent[page]) {
     app.innerHTML = publicContent[page]();
     bindPublic();
+    initScrollReveals(app);
 
     if (page === 'plans') renderPlans();
     if (['login', 'register', 'forgot-password'].includes(page)) handleAuth();
@@ -3636,16 +3683,14 @@ async function init() {
   if (page === 'home') {
     app.innerHTML = home();
     bindPublic();
-
-    const principles = [...app.querySelectorAll('.section')]
-      .find(section => section.querySelector('.eyebrow')?.textContent === 'OUR PRINCIPLES');
-
-    principles?.classList.add('home-principles');
-    setupHeroCarousel();
+    initScrollReveals(app);
     return;
   }
 
-  if (await protect()) await memberPage();
+  if (await protect()) {
+    await memberPage();
+    initScrollReveals(app);
+  }
 }
 
 init();
