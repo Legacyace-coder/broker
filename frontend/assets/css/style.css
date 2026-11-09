@@ -3145,3 +3145,177 @@ h1, h2, h3, h4 {
   background: var(--ns-surface-muted);
   color: var(--ns-text);
 }
+
+/* =========================================================
+   NORTHSTAR_HERO_BACKGROUND_CAROUSEL_V1
+
+   Full-bleed homepage background slideshow.
+   ========================================================= */
+
+.hero-home {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: #17231d;
+}
+
+/* The slideshow occupies the entire hero, not one side. */
+
+.hero-home-slideshow {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.hero-home .hero-home-image {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  object-position: center 45%;
+
+  left: 0;
+  right: 0;
+
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(1.045);
+
+  animation: none !important;
+
+  transition:
+    opacity 1100ms ease,
+    visibility 1100ms ease,
+    transform 6500ms ease;
+
+  will-change: opacity, transform;
+}
+
+.hero-home .hero-home-image.is-active {
+  opacity: 1;
+  visibility: visible;
+  transform: scale(1);
+}
+
+/* Keep the overlay above images and below homepage content. */
+
+.hero-home::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Light theme: retain the editorial ivory treatment while
+   allowing the photograph to remain visible across the hero. */
+
+:root[data-theme="light"] .hero-home {
+  background: #d9d8cd;
+  color: #202b25;
+}
+
+:root[data-theme="light"] .hero-home::after {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(244, 242, 236, .90) 0%,
+      rgba(244, 242, 236, .78) 46%,
+      rgba(244, 242, 236, .55) 100%
+    ),
+    linear-gradient(
+      0deg,
+      rgba(244, 242, 236, .24),
+      transparent 65%
+    );
+}
+
+/* Dark theme: stronger contrast for white text. */
+
+:root[data-theme="dark"] .hero-home {
+  background: #111b18;
+}
+
+:root[data-theme="dark"] .hero-home::after {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(13, 25, 19, .90) 0%,
+      rgba(13, 25, 19, .76) 48%,
+      rgba(13, 25, 19, .53) 100%
+    ),
+    linear-gradient(
+      0deg,
+      rgba(13, 25, 19, .30),
+      transparent 65%
+    );
+}
+
+/* Keep all hero content above the slideshow and overlay. */
+
+.hero-home .hero-home-content {
+  position: relative;
+  z-index: 2;
+}
+
+/* Mobile: the photograph remains a full background. */
+
+@media (max-width: 580px) {
+  .hero-home {
+    min-height: 690px;
+  }
+
+  .hero-home .hero-home-image {
+    object-position: 58% center;
+  }
+
+  :root[data-theme="light"] .hero-home::after {
+    background:
+      linear-gradient(
+        90deg,
+        rgba(244, 242, 236, .91),
+        rgba(244, 242, 236, .76)
+      ),
+      linear-gradient(
+        0deg,
+        rgba(244, 242, 236, .35),
+        transparent 75%
+      );
+  }
+
+  :root[data-theme="dark"] .hero-home::after {
+    background:
+      linear-gradient(
+        90deg,
+        rgba(13, 25, 19, .91),
+        rgba(13, 25, 19, .72)
+      );
+  }
+}
+
+/* Reduced motion: show one still image without transitions. */
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-home .hero-home-image {
+    transition: none !important;
+    transform: none !important;
+    animation: none !important;
+  }
+
+  .hero-home .hero-home-image:not(.is-active) {
+    opacity: 0 !important;
+    visibility: hidden !important;
+  }
+
+  .hero-home .hero-home-image.is-active {
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+}
+
+/* END NORTHSTAR_HERO_BACKGROUND_CAROUSEL_V1 */

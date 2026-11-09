@@ -494,9 +494,79 @@ function placeholderImage(image, alt) {
   </figure>`;
 }
 
+function initHeroCarousel(root) {
+  const hero = root.querySelector('.hero-home');
+  if (!hero) return;
+
+  const slides = Array.from(
+    hero.querySelectorAll('[data-hero-slide]')
+  );
+
+  if (slides.length < 2) return;
+
+  const counter = hero.querySelector('[data-hero-slide-counter]');
+
+  // Keep the first image static when reduced motion is requested.
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    return;
+  }
+
+  let activeIndex = 0;
+
+  window.setInterval(() => {
+    // Avoid unnecessary image changes in background tabs.
+    if (document.hidden) return;
+
+    slides[activeIndex].classList.remove('is-active');
+
+    activeIndex = (activeIndex + 1) % slides.length;
+
+    slides[activeIndex].classList.add('is-active');
+
+    if (counter) {
+      const current = String(activeIndex + 1).padStart(2, '0');
+      const total = String(slides.length).padStart(2, '0');
+
+      counter.textContent = `${current} / ${total}`;
+    }
+  }, 2000);
+}
 function home() {
   return `<section class="hero hero-home">
-    <img class="hero-home-image" src="assets/images/company team hero background.jpg" alt="Researchers working together" fetchpriority="high">
+    <div class="hero-home-slideshow" aria-hidden="true">
+  <img
+    class="hero-home-image hero-home-slide is-active"
+    data-hero-slide
+    src="assets/images/company team hero background.jpg"
+    alt=""
+    fetchpriority="high"
+    decoding="async"
+  >
+  <img
+    class="hero-home-image hero-home-slide"
+    data-hero-slide
+    src="assets/images/digital assets.jpg"
+    alt=""
+    loading="eager"
+    decoding="async"
+  >
+  <img
+    class="hero-home-image hero-home-slide"
+    data-hero-slide
+    src="assets/images/real estate.jpg"
+    alt=""
+    loading="eager"
+    decoding="async"
+  >
+  <img
+    class="hero-home-image hero-home-slide"
+    data-hero-slide
+    src="assets/images/agriculture.jpg"
+    alt=""
+    loading="eager"
+    decoding="async"
+  >
+</div>
     <div class="container hero-home-content">
       <p class="hero-home-kicker"><span>Independent perspective</span><span>Digital assets · Property · Agriculture</span></p>
       <h1>Northstar<br><span>Capital</span></h1>
@@ -506,7 +576,7 @@ function home() {
         <a class="btn btn-primary" href="pages/digital-assets.html">Explore our research</a>
         <a class="btn btn-outline" href="pages/about.html">Our approach <span aria-hidden="true">↗</span></a>
       </div>
-      <div class="hero-home-foot"><span>Perspective before participation</span><span>01 / 03</span></div>
+      <div class="hero-home-foot"><span>Perspective before participation</span><span data-hero-slide-counter>01 / 04</span></div>
     </div>
   </section>
 
@@ -3737,6 +3807,7 @@ async function init() {
 
   if (page === 'home') {
     app.innerHTML = home();
+    initHeroCarousel(app);
     bindPublic();
     initScrollReveals(app);
     return;
