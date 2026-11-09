@@ -3482,3 +3482,152 @@ h1, h2, h3, h4 {
 }
 
 /* END NORTHSTAR_HERO_BACKGROUND_CAROUSEL_V2 */
+/* NORTHSTAR_HERO_SPACING_V3
+   Updated homepage imagery and balanced content spacing.
+*/
+
+.hero-home {
+  position: relative !important;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* Keep hero text comfortably away from the viewport edges. */
+
+.hero-home .hero-home-content {
+  box-sizing: border-box;
+  width: min(
+    calc(100% - clamp(40px, 10vw, 144px)),
+    var(--max)
+  ) !important;
+  max-width: var(--max);
+  margin-inline: auto !important;
+  padding-inline: 0 !important;
+  position: relative;
+  z-index: 2 !important;
+}
+
+/* Keep the kicker and footer aligned with the content. */
+
+.hero-home .hero-home-kicker,
+.hero-home .hero-home-foot {
+  width: 100%;
+  max-width: 760px;
+  box-sizing: border-box;
+}
+
+.hero-home .hero-home-kicker {
+  margin-bottom: clamp(28px, 4vw, 43px);
+}
+
+.hero-home .hero-home-foot {
+  margin-top: auto;
+}
+
+/* Preserve full-bleed slideshow coverage. */
+
+.hero-home .hero-home-slideshow {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 0 !important;
+  overflow: hidden;
+}
+
+.hero-home .hero-home-image {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  object-fit: cover !important;
+  object-position: center center;
+}
+
+/* Keep inactive slides hidden and active slides visible. */
+
+:root[data-theme="light"] .hero-home .hero-home-image:not(.is-active),
+:root[data-theme="dark"] .hero-home .hero-home-image:not(.is-active) {
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+:root[data-theme="light"] .hero-home .hero-home-image.is-active,
+:root[data-theme="dark"] .hero-home .hero-home-image.is-active {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Mobile spacing: consistent breathing room without wasting space. */
+
+@media (max-width: 580px) {
+  .hero-home .hero-home-content {
+    width: calc(100% - 40px) !important;
+    max-width: none;
+    padding-inline: 0 !important;
+    padding-block: 52px 22px;
+  }
+
+  .hero-home .hero-home-kicker {
+    gap: 10px;
+    margin-bottom: 32px;
+  }
+
+  .hero-home .hero-home-foot {
+    gap: 12px;
+    font-size: .59rem;
+  }
+}
+
+/* END NORTHSTAR_HERO_SPACING_V3 */
+
+
+/* NORTHSTAR_HERO_SPACING_V4 */
+.hero-home {
+    position: relative;
+    overflow: hidden;
+}
+
+.hero-home .hero-home-slideshow {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.hero-home .hero-home-image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+}
+
+.hero-home .hero-home-content {
+    position: relative;
+    z-index: 2;
+    width: min(calc(100% - clamp(48px, 10vw, 144px)), var(--max));
+    max-width: var(--max);
+    margin-inline: auto;
+    padding-inline: 0;
+}
+
+.hero-home .hero-home-kicker,
+.hero-home .hero-home-foot {
+    max-width: 100%;
+}
+
+@media (max-width: 767px) {
+    .hero-home .hero-home-content {
+        width: calc(100% - 40px);
+        padding-inline: 0;
+    }
+
+    .hero-home .hero-home-foot {
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+}

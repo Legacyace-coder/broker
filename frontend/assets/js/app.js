@@ -534,55 +534,10 @@ function initHeroCarousel(root) {
 function home() {
   return `<section class="hero hero-home">
     <div class="hero-home-slideshow" aria-hidden="true">
-  <img
-    class="hero-home-image hero-home-slide is-active"
-    data-hero-slide
-    src="assets/images/company-team1 .jpg"
-    alt=""
-    fetchpriority="high"
-    decoding="async"
-  >
-  <img
-    class="hero-home-image hero-home-slide"
-    data-hero-slide
-    src="assets/images/blockchain.jpg"
-    alt=""
-    loading="eager"
-    decoding="async"
-  >
-  <img
-    class="hero-home-image hero-home-slide"
-    data-hero-slide
-    src="assets/images/real estate page hero background.jpg"
-    alt=""
-    loading="eager"
-    decoding="async"
-  >
-  <img
-    class="hero-home-image hero-home-slide"
-    data-hero-slide
-    src="assets/images/agriculture page hero background.jpg"
-    alt=""
-    loading="eager"
-    decoding="async"
-  >
-  <img
-    class="hero-home-image hero-home-slide"
-    data-hero-slide
-    src="assets/images/RESPONSIBLE BUSINESS background.jpg"
-    alt=""
-    loading="eager"
-    decoding="async"
-  >
-  <img
-    class="hero-home-image hero-home-slide"
-    data-hero-slide
-    src="assets/images/custody and security background.jpg"
-    alt=""
-    loading="eager"
-    decoding="async"
-  >
-</div>
+    <img class="hero-home-image is-active" src="assets/images/home page digital asset cta background.jpg" data-hero-slide alt="" />
+    <img class="hero-home-image" src="assets/images/clear communication.jpg" data-hero-slide alt="" />
+    <img class="hero-home-image" src="assets/images/home page Risk awareness cta image.jpg" data-hero-slide alt="" />
+  </div>
     <div class="container hero-home-content">
       <p class="hero-home-kicker"><span>Independent perspective</span><span>Digital assets · Property · Agriculture</span></p>
       <h1>Northstar<br><span>Capital</span></h1>
@@ -592,7 +547,7 @@ function home() {
         <a class="btn btn-primary" href="pages/digital-assets.html">Explore our research</a>
         <a class="btn btn-outline" href="pages/about.html">Our approach <span aria-hidden="true">↗</span></a>
       </div>
-      <div class="hero-home-foot"><span>Perspective before participation</span><span data-hero-slide-counter>01 / 06</span></div>
+      <div class="hero-home-foot"><span>Perspective before participation</span><span data-hero-slide-counter>01 / 07</span></div>
     </div>
   </section>
 
