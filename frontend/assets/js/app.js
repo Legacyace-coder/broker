@@ -591,7 +591,7 @@ function home() {
     <div class="hero-home-slideshow" aria-hidden="true">
     <img class="hero-home-image is-active" src="assets/images/home page digital asset cta background.jpg" data-hero-slide alt="" />
     <img class="hero-home-image" src="assets/images/clear communication.jpg" data-hero-slide alt="" />
-    <img class="hero-home-image" src="assets/images/home page Risk awareness cta image.jpg" data-hero-slide alt="" />
+    <img class="hero-home-image" src="assets/images/company team hero background.jpg" data-hero-slide alt="" />
   </div>
     <div class="container hero-home-content">
       <p class="hero-home-kicker"><span>Independent perspective</span><span>Digital assets · Property · Agriculture</span></p>
