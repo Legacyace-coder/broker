@@ -179,13 +179,41 @@ function nav() {
   const items = isMember ? memberItems : publicItems;
   const n = $('#main-nav');
 
-  n.innerHTML = items.map(([t, p]) =>
-    `<a href="${root}${p}">${t}</a>`
-  ).join('') + (isMember
+  n.innerHTML = items.map(([t, p]) => {
+    if (t === 'Sectors') {
+      return `
+        <div class="nav-dropdown">
+          <button
+            type="button"
+            class="nav-dropdown-toggle"
+            aria-haspopup="true"
+            aria-expanded="false"
+            aria-controls="sectors-dropdown-menu">
+            <span>Sectors</span>
+            <span class="nav-dropdown-chevron" aria-hidden="true">⌄</span>
+          </button>
+          <div class="nav-dropdown-menu" id="sectors-dropdown-menu">
+            <a href="${root}pages/digital-assets.html">
+              <span class="nav-dropdown-number">01</span>
+              <span>Digital Assets</span>
+            </a>
+            <a href="${root}pages/real-estate.html">
+              <span class="nav-dropdown-number">02</span>
+              <span>Real Estate</span>
+            </a>
+            <a href="${root}pages/agriculture.html">
+              <span class="nav-dropdown-number">03</span>
+              <span>Agriculture</span>
+            </a>
+          </div>
+        </div>`;
+    }
+
+    return `<a href="${root}${p}">${t}</a>`;
+  }).join('') + (isMember
     ? `<a href="${root}index.html" data-logout>Sign out</a>`
     : `<a class="btn btn-outline" href="${root}pages/login.html">Login</a>
        <a class="btn btn-primary" href="${root}pages/register.html">Create account</a>`);
-
   n.insertAdjacentHTML('beforeend', `
     <button type="button" class="theme-toggle" data-theme-toggle
       aria-label="Switch colour theme" aria-pressed="false">
