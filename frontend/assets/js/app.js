@@ -192,6 +192,61 @@ function nav() {
       <span class="theme-toggle-icon" aria-hidden="true">☀️</span><span>Light mode</span>
     </button>
   `);
+
+// NORTHSTAR_SECTORS_DROPDOWN_INTERACTIONS
+  const sectorsDropdown = n.querySelector('.nav-dropdown');
+  const sectorsToggle = n.querySelector('.nav-dropdown-toggle');
+
+  if (sectorsDropdown && sectorsToggle) {
+    const closeSectorsDropdown = () => {
+      sectorsDropdown.classList.remove('is-open');
+      sectorsToggle.setAttribute('aria-expanded', 'false');
+    };
+
+    sectorsToggle.addEventListener('click', event => {
+      event.stopPropagation();
+
+      const isOpen = sectorsDropdown.classList.toggle('is-open');
+      sectorsToggle.setAttribute('aria-expanded', String(isOpen));
+    });
+
+    document.addEventListener('pointerdown', event => {
+      if (!sectorsDropdown.contains(event.target)) {
+        closeSectorsDropdown();
+      }
+    });
+
+    sectorsToggle.addEventListener('keydown', event => {
+      if (event.key === 'Escape') {
+        closeSectorsDropdown();
+        sectorsToggle.focus();
+      }
+
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        sectorsDropdown.classList.add('is-open');
+        sectorsToggle.setAttribute('aria-expanded', 'true');
+        sectorsDropdown.querySelector('.nav-dropdown-menu a')?.focus();
+      }
+    });
+
+    sectorsDropdown.querySelectorAll('.nav-dropdown-menu a').forEach(link => {
+      link.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+          closeSectorsDropdown();
+          sectorsToggle.focus();
+        }
+      });
+    });
+
+    sectorsDropdown.querySelectorAll('.nav-dropdown-menu a').forEach(link => {
+      link.addEventListener('click', () => {
+        closeSectorsDropdown();
+        n.classList.remove('open');
+        $('.menu-toggle')?.setAttribute('aria-expanded', 'false');
+      });
+    });
+  }
   bindThemeToggle();
   applyTheme(document.documentElement.dataset.theme);
 
