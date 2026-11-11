@@ -215,8 +215,12 @@ function nav() {
               <span class="nav-dropdown-number">02</span>
               <span>Real Estate</span>
             </a>
-            <a href="${root}pages/agriculture.html">
+            <a href="${root}pages/gold-mining.html">
               <span class="nav-dropdown-number">03</span>
+              <span>Gold Mining</span>
+            </a>
+            <a href="${root}pages/agriculture.html">
+              <span class="nav-dropdown-number">04</span>
               <span>Agriculture</span>
             </a>
           </div>
@@ -644,10 +648,10 @@ function home() {
     <img class="hero-home-image" src="assets/images/company team hero background.jpg" data-hero-slide alt="" />
   </div>
     <div class="container hero-home-content">
-      <p class="hero-home-kicker"><span>Independent perspective</span><span>Digital assets · Property · Agriculture</span></p>
+      <p class="hero-home-kicker"><span>Independent perspective</span><span>Digital assets · Property · Gold mining · Agriculture</span></p>
       <h1>Northstar<br><span>Capital</span></h1>
       <p class="hero-home-intro">Research for decisions in changing markets.</p>
-      <p class="hero-home-copy">A considered view of digital assets, real estate and agriculture, grounded in context, due diligence and a clear-eyed understanding of risk.</p>
+      <p class="hero-home-copy">A considered view of digital assets, real estate, gold mining and agriculture, grounded in context, due diligence and a clear-eyed understanding of risk.</p>
       <div class="hero-actions">
         <a class="btn btn-primary" href="pages/digital-assets.html">Explore our research</a>
         <a class="btn btn-outline" href="pages/about.html">Our approach <span aria-hidden="true">↗</span></a>
@@ -659,7 +663,7 @@ function home() {
   <section class="home-sectors section">
     <div class="container">
       <div class="home-section-heading">
-        <div><p class="eyebrow">Research areas</p><h2>Three markets.<br>One measured lens.</h2></div>
+        <div><p class="eyebrow">Research areas</p><h2>Four markets.<br>One measured lens.</h2></div>
         <p>We look beyond the headline to understand structures, constraints and the forces that shape long-term outcomes.</p>
       </div>
       <div class="home-sector-list">
@@ -943,12 +947,13 @@ const publicContent = {
     <div class="container">
       <div class="section-heading">
         <p class="eyebrow">OUR AREAS OF INTEREST</p>
-        <h2>Three areas. A broader perspective.</h2>
+        <h2>Four areas. A broader perspective.</h2>
         <p>The Northstar Capital website presents the following sectors for exploration.</p>
       </div>
       ${cards([
         ['Digital Assets', 'Explore blockchain-based assets, digital infrastructure and the changing digital asset economy.'],
         ['Real Estate', 'Explore property markets, real assets and the factors that influence property investment.'],
+        ['Gold Mining', 'Explore gold geology, mineral extraction, processing, operational risk and responsible mine closure.'],
         ['Agriculture', 'Explore agricultural production, processing, storage and market access.']
       ])}
     </div>
@@ -1017,8 +1022,25 @@ const publicContent = {
     'real-estate'
   ),
 
-  agriculture: () => sector(
+  'gold-mining': () => sector(
     'OUR SECTORS / 03',
+    'Understanding the<br><span>gold mining sector.</span>',
+    'Explore gold geology, mineral extraction, processing and the commercial and environmental considerations shaping the sector.',
+    [
+      ['Exploration and geology', 'Mineral exploration, geological surveys, resource estimation and the uncertainty involved in identifying viable deposits.'],
+      ['Mining and processing', 'Extraction methods, ore handling, processing systems, recovery rates and operating costs.'],
+      ['Economics and operational risk', 'Capital requirements, commodity prices, infrastructure, safety and operational continuity.'],
+      ['Environmental responsibility', 'Land rehabilitation, water management, tailings oversight and responsible mine closure.']
+    ],
+    'gold.jpg',
+    'Gold ore and refined gold displayed in a close-up photograph.',
+    'gold-mining'
+  ),
+
+
+
+  agriculture: () => sector(
+    'OUR SECTORS / 04',
     'Supporting the<br><span>future of food.</span>',
     'Explore agricultural production, processing, storage and market access.',
     [
@@ -1149,18 +1171,24 @@ function sector(kicker, title, sub, items, image, imageAlt, sectorName, images =
     `<section class="page-hero sector-page-hero sector-page-hero--${sectorName}">`
   );
 
+  const imageMarkup = image
+    ? `<figure class="sector-image">
+        <img src="../assets/images/${encodeURIComponent(image).replace(/%2F/g, '/')}" alt="${esc(imageAlt)}" loading="lazy">
+      </figure>`
+    : '';
+
+  const layoutClass = image ? 'grid grid-2' : '';
+
   return `${hero}
   <section class="section">
-    <div class="container grid grid-2">
+    <div class="container ${layoutClass}">
       <div>
         <p class="eyebrow">OUR APPROACH</p>
         <h2>Understand the fundamentals.</h2>
         <p>Each asset class has its own risks, costs and operating conditions. Research and due diligence should come before any commitment.</p>
         <p>Values can decline and an investment may not be easy to sell. No outcome is guaranteed.</p>
       </div>
-      <figure class="sector-image">
-        <img src="../assets/images/${encodeURIComponent(image).replace(/%2F/g, '/')}" alt="${esc(imageAlt)}" loading="lazy">
-      </figure>
+      ${imageMarkup}
     </div>
   </section>
   <section class="section section-alt">
@@ -1763,6 +1791,47 @@ async function memberPage() {
             <div id="market-notice" aria-live="polite"></div>
           </section>
 
+
+          <section class="ns-dashboard-section ns-forex-section" aria-label="Forex and global markets">
+            <div class="ns-section-heading">
+              <div>
+                <p class="eyebrow">GLOBAL MARKETS</p>
+                <h3>Forex &amp; global markets</h3>
+              </div>
+              <span class="ns-section-note">Market reference · TradingView</span>
+            </div>
+
+            <div class="ns-forex-panel">
+              <div class="ns-forex-widget-heading">
+                <div>
+                  <h4>EUR / USD</h4>
+                  <span>Advanced market chart</span>
+                </div>
+                <span>15-minute interval</span>
+              </div>
+              <div class="tradingview-widget-container ns-tradingview-chart" id="forex-chart-widget">
+                <div class="tradingview-widget-container__widget"></div>
+              </div>
+            </div>
+
+            <div class="ns-forex-panel">
+              <div class="ns-forex-widget-heading">
+                <div>
+                  <h4>Forex cross-rates</h4>
+                  <span>Selected major currencies</span>
+                </div>
+                <span>Live reference rates</span>
+              </div>
+              <div class="tradingview-widget-container ns-tradingview-rates" id="forex-rates-widget">
+                <div class="tradingview-widget-container__widget"></div>
+              </div>
+            </div>
+
+            <p class="ns-forex-disclaimer">
+              Market data is provided by TradingView for reference and may be delayed.
+              It does not represent executable prices or investment advice.
+            </p>
+          </section>
           <div class="ns-dashboard-columns">
             <section class="ns-dashboard-section ns-contract-section">
               <div class="ns-section-heading">
@@ -1935,6 +2004,47 @@ async function memberPage() {
           </section>
         </div>`;
 
+      const mountTradingViewWidget = (containerId, scriptUrl, config) => {
+        const container = document.getElementById(containerId);
+        if (!container || container.dataset.widgetLoaded === 'true') return;
+
+        const script = document.createElement('script');
+        script.type = 'text/javascript';
+        script.src = scriptUrl;
+        script.async = true;
+        script.textContent = JSON.stringify(config);
+
+        container.dataset.widgetLoaded = 'true';
+        container.appendChild(script);
+      };
+
+      mountTradingViewWidget(
+        'forex-chart-widget',
+        'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js',
+        {
+          autosize: true,
+          symbol: 'FX:EURUSD',
+          interval: '15',
+          timezone: 'Africa/Lagos',
+          theme: 'dark',
+          style: '1',
+          locale: 'en',
+          allow_symbol_change: true,
+          support_host: 'https://www.tradingview.com'
+        }
+      );
+
+      mountTradingViewWidget(
+        'forex-rates-widget',
+        'https://s3.tradingview.com/external-embedding/embed-widget-forex-cross-rates.js',
+        {
+          width: '100%',
+          height: 400,
+          currencies: ['EUR', 'USD', 'JPY', 'GBP', 'CHF', 'AUD', 'CAD', 'NGN'],
+          colorTheme: 'dark',
+          locale: 'en'
+        }
+      );
       referralPromise.then(referral => {
         const target = $('#dashboard-referral-content', main);
         const referralCode = String(referral?.referral_code || '');

@@ -2214,6 +2214,70 @@ h1, h2, h3, h4 {
 .ns-referral-section .referral-overview > div { border-color: var(--ns-line, var(--line)); background: transparent; }
 .ns-referral-section .field input { background: var(--ns-bg, var(--bg)); color: var(--ns-text, var(--text)); }
 .ns-dashboard .status { font-size: .76rem; }
+.ns-forex-section {
+  display: grid;
+  gap: 17px;
+}
+
+.ns-forex-panel {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--ns-line, var(--line));
+  background: var(--ns-bg, var(--bg));
+}
+
+.ns-forex-widget-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  padding: 15px 17px;
+  border-bottom: 1px solid var(--ns-line, var(--line));
+}
+
+.ns-forex-widget-heading > div {
+  display: grid;
+  gap: 4px;
+}
+
+.ns-forex-widget-heading h4 {
+  margin: 0;
+  color: var(--ns-text, var(--text));
+  font: 700 .9rem Manrope, sans-serif;
+}
+
+.ns-forex-widget-heading span {
+  color: var(--ns-muted, var(--muted));
+  font-size: .72rem;
+}
+
+.ns-tradingview-chart {
+  width: 100%;
+  height: 500px;
+  min-width: 0;
+}
+
+.ns-tradingview-chart .tradingview-widget-container__widget {
+  width: 100%;
+  height: 100%;
+}
+
+.ns-tradingview-rates {
+  width: 100%;
+  min-width: 0;
+}
+
+.ns-tradingview-rates .tradingview-widget-container__widget {
+  width: 100%;
+}
+
+.ns-forex-disclaimer {
+  margin: 0;
+  color: var(--ns-muted, var(--muted));
+  font-size: .7rem;
+  line-height: 1.6;
+}
+
 @media (max-width: 1050px) {
   .member-dashboard-shell .dashboard-layout { grid-template-columns: 1fr; gap: 20px; }
   .member-dashboard-shell .sidebar { position: static; grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -4064,3 +4128,77 @@ iframe#tawkchat-minified-iframe {
 }
 
 /* END NORTHSTAR_BALANCE_SAGE_AND_FLOATING_CHAT_V1 */
+
+/* NORTHSTAR_GOLD_MINING_SECTOR_V1 */
+
+/* Gold Mining hero: a restrained mineral-inspired treatment. */
+.sector-page-hero--gold-mining {
+  --page-hero-image:
+    url("../images/gold mining hero image.jpg");
+  background-image:
+    linear-gradient(90deg, rgba(30, 27, 21, .96), rgba(54, 43, 27, .70), rgba(65, 49, 27, .20)),
+    radial-gradient(ellipse at 78% 42%, rgba(190, 145, 57, .30), transparent 42%),
+    linear-gradient(115deg, #252117 0%, #5a4728 52%, #9a7738 100%);
+}
+
+.sector-page-hero--gold-mining::before {
+  background-image:
+    linear-gradient(90deg, rgba(30, 27, 21, .96) 0%, rgba(54, 43, 27, .72) 52%, rgba(65, 49, 27, .24) 100%),
+    var(--page-hero-image);
+}
+
+.sector-page-hero--gold-mining,
+.sector-page-hero--gold-mining h1,
+.sector-page-hero--gold-mining .eyebrow {
+  color: #fffaf0;
+}
+
+.sector-page-hero--gold-mining p:not(.eyebrow) {
+  color: rgba(255, 250, 240, .82);
+}
+
+/* Homepage sector marker: chemical symbol for gold. */
+.home-sector-visual {
+  display: flex;
+  width: 100%;
+  height: 134px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 70% 25%, rgba(236, 197, 112, .28), transparent 34%),
+    linear-gradient(135deg, #211d16, #594523 58%, #9b783a);
+  color: #f2d79a;
+}
+
+.home-sector-visual > span {
+  font: 700 3.2rem/.9 Manrope, sans-serif;
+  letter-spacing: -.08em;
+}
+
+.home-sector-visual > small {
+  align-self: flex-start;
+  margin-top: 34px;
+  font: 600 .8rem Manrope, sans-serif;
+  opacity: .8;
+}
+
+@media (max-width: 580px) {
+  .home-sector-row > .home-sector-visual {
+    height: 105px;
+  }
+
+  .home-sector-visual > span {
+    font-size: 2.5rem;
+  }
+
+  .sector-page-hero--gold-mining {
+    background-image:
+      linear-gradient(90deg, rgba(30, 27, 21, .94), rgba(54, 43, 27, .76)),
+      radial-gradient(ellipse at 78% 42%, rgba(190, 145, 57, .30), transparent 42%),
+      linear-gradient(115deg, #252117 0%, #5a4728 52%, #9a7738 100%);
+  }
+}
+
+/* END NORTHSTAR_GOLD_MINING_SECTOR_V1 */
