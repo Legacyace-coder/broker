@@ -70,6 +70,7 @@ const root = location.pathname.includes('/pages/') ||
 
 
 /* NORTHSTAR_FOUNDATION_V1 */
+/* NORTHSTAR_THEME_SVG_FIX_V1 */
 const THEME_KEY = 'northstar-theme';
 
 function getThemePreference() {
@@ -100,11 +101,24 @@ function applyTheme(preference = getThemePreference()) {
       dark: 'Dark'
     };
 
+    const icons = {
+      light: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4"/>
+        <path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/>
+      </svg>`,
+      dark: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2Z"/>
+        <path d="M16.5 3v3m-1.5-1.5h3"/>
+      </svg>`,
+      system: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="13" rx="2"/>
+        <path d="M8 21h8m-4-4v4"/>
+      </svg>`
+    };
+
     toggle.innerHTML = `
-      <span class="theme-toggle-icon" aria-hidden="true">
-        ${preference === 'light' ? '?' : preference === 'dark' ? '?' : '?'}
-      </span>
-      <span>Theme: ${labels[preference]}</span>
+      <span class="theme-toggle-icon" aria-hidden="true">${icons[preference]}</span>
+      <span class="theme-toggle-label">Theme: ${labels[preference]}</span>
     `;
 
     toggle.setAttribute(
@@ -217,9 +231,17 @@ function nav() {
   n.insertAdjacentHTML('beforeend', `
     <button type="button" class="theme-toggle" data-theme-toggle
       aria-label="Switch colour theme" aria-pressed="false">
-      <span class="theme-toggle-icon" aria-hidden="true">☀️</span><span>Light mode</span>
+      <span class="theme-toggle-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="13" rx="2"/>
+          <path d="M8 21h8m-4-4v4"/>
+        </svg>
+      </span>
+      <span class="theme-toggle-label">Theme: System</span>
     </button>
   `);
+
+  applyTheme(getThemePreference());
 
 // NORTHSTAR_SECTORS_DROPDOWN_INTERACTIONS
   const sectorsDropdown = n.querySelector('.nav-dropdown');

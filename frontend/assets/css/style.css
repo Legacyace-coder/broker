@@ -4002,3 +4002,65 @@ h1, h2, h3, h4 {
   }
 }
 /* END NORTHSTAR_CELESTIAL_THEME_TOGGLE_V1 */
+
+/* NORTHSTAR_BALANCE_SAGE_AND_FLOATING_CHAT_V1 */
+
+/* Softer available-balance panel */
+.ns-account-primary {
+  background: linear-gradient(
+    135deg,
+    rgba(211, 224, 208, 0.96),
+    rgba(190, 208, 188, 0.92)
+  );
+  color: #24352a;
+}
+
+.ns-account-primary .ns-account-label {
+  color: #526653;
+}
+
+.ns-account-primary .ns-account-reference {
+  color: #718271;
+}
+
+.ns-account-primary > strong {
+  color: #1d3024;
+}
+
+.ns-account-primary > p {
+  color: #536657;
+}
+
+.ns-account-primary .ns-text-action {
+  color: #304b38;
+}
+
+.ns-account-primary .ns-account-actions .btn-primary {
+  background: #344f3b;
+  border-color: #344f3b;
+  color: #f7f6ef;
+}
+
+.ns-account-primary .ns-account-actions .btn-primary:hover {
+  background: #263e2e;
+  border-color: #263e2e;
+}
+
+/* Keep the Tawk.to launcher fixed while the page scrolls */
+#tawk-bubble-container,
+iframe#tawkchat-minified-iframe {
+  position: fixed !important;
+  right: 20px !important;
+  bottom: 20px !important;
+  z-index: 2147483000 !important;
+}
+
+@media (max-width: 580px) {
+  #tawk-bubble-container,
+  iframe#tawkchat-minified-iframe {
+    right: 12px !important;
+    bottom: 12px !important;
+  }
+}
+
+/* END NORTHSTAR_BALANCE_SAGE_AND_FLOATING_CHAT_V1 */
