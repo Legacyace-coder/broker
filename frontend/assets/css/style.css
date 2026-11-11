@@ -1834,12 +1834,12 @@ body.page-leaving {
 }
 
 @keyframes page-arrive {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes page-depart {
-  to { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 0; }
 }
 
 @media(prefers-reduced-motion:reduce) {
