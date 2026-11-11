@@ -3869,34 +3869,49 @@ function bindPublic() {
 }
 
 /* NORTHSTAR_TAWKTO_CHAT_V1 */
+/* NORTHSTAR_TAWKTO_RECOVERY_V2 */
 function initTawkChat() {
-  // Keep customer-facing chat out of the admin dashboard.
+  // Never load customer chat inside the admin area.
   if (page.startsWith('admin-') || location.pathname.includes('/admin/')) {
     return;
   }
 
-  // Prevent duplicate widget injection.
-  if (document.getElementById('northstar-tawkto-script')) {
-    return;
-  }
-
+  // Initialize the API BEFORE checking for an existing loader.
   window.Tawk_API = window.Tawk_API || {};
   window.Tawk_LoadStart = window.Tawk_LoadStart || new Date();
+
+  const existing = document.getElementById('northstar-tawkto-script');
+
+  if (existing) {
+    // A successfully loaded script should not be injected twice.
+    if (existing.dataset.loaded === 'true') {
+      return;
+    }
+
+    // Remove a stale or previously failed loader so it can be retried.
+    existing.remove();
+  }
 
   const script = document.createElement('script');
   script.id = 'northstar-tawkto-script';
   script.async = true;
   script.src = 'https://embed.tawk.to/6af3b0285fbe7b3c4b749183/1k73ug8mo';
   script.charset = 'UTF-8';
-  script.setAttribute('crossorigin', '*');
+  script.setAttribute('crossorigin', 'anonymous');
 
-  const firstScript = document.getElementsByTagName('script')[0];
+  script.onload = () => {
+    script.dataset.loaded = 'true';
+    console.info('[Northstar] Tawk.to loader loaded.');
+  };
 
-  if (firstScript?.parentNode) {
-    firstScript.parentNode.insertBefore(script, firstScript);
-  } else {
-    document.head.appendChild(script);
-  }
+  script.onerror = () => {
+    console.error(
+      '[Northstar] Tawk.to failed to load. Check CSP, network access, or browser extensions.'
+    );
+    script.remove();
+  };
+
+  document.head.appendChild(script);
 }
 async function init() {
   initTheme();
