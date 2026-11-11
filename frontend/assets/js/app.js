@@ -671,7 +671,7 @@ function home() {
         <h2>Context before conviction.</h2>
         <p>Markets move. Information changes. We focus on explaining the factors that shape a decision, not on predictions or promises.</p>
         <a class="text-link" href="pages/about.html">Read our approach <span aria-hidden="true">→</span></a>
-        <p class="home-method-note">General information only. Not investment advice.</p>
+
       </div>
     </div>
   </section>
@@ -878,37 +878,56 @@ function setupHeroCarousel() {
 
 const publicContent = {
   about: () => `${pageHero(
-    'WHO WE ARE',
-    'Building with purpose.<br><span>Investing with perspective.</span>',
-    'Discover the principles, people and long-term thinking behind Northstar Capital.',
+    'ABOUT NORTHSTAR',
+    'A company built<br><span>with a long-term view.</span>',
+    'An introduction to Northstar Capital Limited and its corporate identity.',
     '',
     'page-hero--company'
   )}
   <section class="section">
     <div class="container grid grid-2">
       <div>
-        <p class="eyebrow">OUR STORY</p>
-        <h2>A thoughtful approach to a changing world.</h2>
-        <p>Northstar Capital is a company concept focused on exploring opportunities across digital assets, property and agriculture. Our approach places research, transparency and responsible decision-making at the centre of the process.</p>
-        <p>Our ambition is to build a business that values enduring relationships over short-term promises.</p>
+        <p class="eyebrow">THE COMPANY</p>
+        <h2>Northstar Capital Limited</h2>
+        <p>Northstar Capital Limited is a private company limited by shares, incorporated in England and Wales on 29 December 2021.</p>
+        <p>The company is registered under company number 13821196.</p>
       </div>
-      ${placeholderImage('company-team1 .jpg', 'A diverse team working together around a table.')}
+      <div class="card">
+        <p class="eyebrow">COMPANY DETAILS</p>
+        <div class="company-detail">
+          <span>Legal name</span>
+          <strong>Northstar Capital Limited</strong>
+        </div>
+        <div class="company-detail">
+          <span>Company number</span>
+          <strong>13821196</strong>
+        </div>
+        <div class="company-detail">
+          <span>Incorporation date</span>
+          <strong>29 December 2021</strong>
+        </div>
+        <div class="company-detail">
+          <span>Company type</span>
+          <strong>Private company limited by shares</strong>
+        </div>
+        <div class="company-detail">
+          <span>Jurisdiction</span>
+          <strong>England and Wales</strong>
+        </div>
+      </div>
     </div>
   </section>
   <section class="section section-alt">
     <div class="container">
       <div class="section-heading">
-        <p class="eyebrow">WHAT GUIDES US</p>
-        <h2>Our principles</h2>
+        <p class="eyebrow">OUR AREAS OF INTEREST</p>
+        <h2>Three areas. A broader perspective.</h2>
+        <p>The Northstar Capital website presents the following sectors for exploration.</p>
       </div>
       ${cards([
-        ['Integrity', 'Communicate honestly and take responsibility.'],
-        ['Research', 'Evaluate opportunities instead of relying on hype.'],
-        ['Long-term thinking', 'Consider resilience and risk over time.']
-      ], [
-        { src: 'integrity cta image.jpg', alt: 'Integrity represented by a handshake.' },
-        { src: 'research cta image.jpg', alt: 'A researcher reviewing information.' },
-        { src: 'long term thinking cta image.jpg', alt: 'A team supporting a bright idea.' }
+        ['Digital Assets', 'Explore blockchain-based assets, digital infrastructure and the changing digital asset economy.'],
+        ['Real Estate', 'Explore property markets, real assets and the factors that influence property investment.'],
+        ['Agriculture', 'Explore agricultural production, processing, storage and market access.']
       ])}
     </div>
   </section>`,
@@ -1003,7 +1022,7 @@ const publicContent = {
         <div class="loading">Loading available categories…</div>
       </div>
       <div class="notice" style="margin-top:28px">
-        No plan guarantees a return. Investment products, where legally offered, require verified disclosures, risk assessment, applicable authorisation and written terms. Do not send funds based only on this demonstration site.
+        Create an Account and Login to Choose a Plan
       </div>
     </div>
   </section>`,
@@ -1036,8 +1055,8 @@ const publicContent = {
 
   contact: () => `${pageHero(
     'CONTACT',
-    'Let’s start a<br><span>conversation.</span>',
-    'Send a message to the team. This demo form validates locally; connect a support inbox or backend endpoint before launch.',
+    'Start a<br><span>conversation.</span>',
+    'For enquiries and further information about Northstar Capital, use the form below.',
     '',
     'page-hero--contact'
   )}
@@ -1045,9 +1064,9 @@ const publicContent = {
     <div class="container grid grid-2">
       <div>
         <p class="eyebrow">GET IN TOUCH</p>
-        <h2>We welcome your questions.</h2>
-        <p>Replace this section with verified company contact details, office address and support hours before publishing.</p>
-        <div class="notice">No real support message is sent until a delivery provider or backend contact endpoint is configured.</div>
+        <h2>We welcome your enquiries.</h2>
+        <p>Whether your enquiry concerns the company, its areas of interest or general information, you can prepare your message here.</p>
+        <p class="muted">Additional contact details will be published here when available.</p>
       </div>
       <form class="form-card form-grid" id="contact-form">
         <div class="field">
@@ -1055,8 +1074,8 @@ const publicContent = {
           <input id="contact-name" name="name" required maxlength="120">
         </div>
         <div class="field">
-          <label for="contact-email">Email</label>
-          <input id="contact-email" name="email" type="email" required>
+          <label for="contact-email">Email address</label>
+          <input id="contact-email" name="email" type="email" required maxlength="254">
         </div>
         <div class="field">
           <label for="contact-subject">Subject</label>
@@ -1066,7 +1085,7 @@ const publicContent = {
           <label for="contact-message">Message</label>
           <textarea id="contact-message" name="message" required maxlength="4000"></textarea>
         </div>
-        <button class="btn btn-primary" type="submit">Validate message</button>
+        <button class="btn btn-primary" type="submit">Prepare enquiry</button>
         <div id="form-message" aria-live="polite"></div>
       </form>
     </div>
@@ -1633,10 +1652,10 @@ async function memberPage() {
       };
 
       const kycMessages = {
-        not_submitted: 'Upload your identity and proof-of-address documents to submit your KYC application.',
-        pending_review: 'Your documents have been submitted and are awaiting administrator review. Further uploads are locked during review.',
-        approved: 'Your KYC application has been approved. Document uploads are locked.',
-        rejected: 'Your previous KYC application was rejected. Review the administrator feedback and upload both required document categories again.'
+        not_submitted: 'Documents required',
+        pending_review: 'Under review',
+        approved: 'Verified',
+        rejected: 'Action required'
       };
 
       const kycLabel = kycLabels[kycStatus] || 'Not submitted';
@@ -1661,7 +1680,7 @@ async function memberPage() {
             <div>
               <p class="eyebrow">YOUR INVESTMENT ACCOUNT</p>
               <h2>Good to have you back, ${esc(displayName.split(' ')[0])}.</h2>
-              <p>A clear view of your capital, commitments and account activity.</p>
+
             </div>
             <div class="ns-account-status">
               <span class="ns-status-dot"></span>
@@ -1677,7 +1696,7 @@ async function memberPage() {
                 <span class="ns-account-reference">WALLET LEDGER</span>
               </div>
               <strong>${money(balance, d.wallet?.asset || 'USDT')}</strong>
-              <p>Funds currently recorded in your account wallet.</p>
+
               <div class="ns-account-actions">
                 <a class="btn btn-primary" href="new-deposit.html">Add funds <span aria-hidden="true">↗</span></a>
                 <a class="ns-text-action" href="withdrawals.html">Withdrawal options <span aria-hidden="true">→</span></a>
@@ -1750,7 +1769,7 @@ async function memberPage() {
                 : `<div class="ns-empty-state">
                     <span class="ns-empty-index">01 / PORTFOLIO</span>
                     <h4>Your investment portfolio starts here.</h4>
-                    <p>Once an investment request is reviewed and approved, its contract will appear in this section.</p>
+
                     <a href="investments.html">Review available plans ↗</a>
                   </div>`}
               <div class="ns-contract-foot">
@@ -2153,14 +2172,14 @@ async function memberPage() {
             <div>
               <p class="eyebrow">WITHDRAWALS</p>
               <h2>Withdraw funds</h2>
-              <p class="muted">Withdrawals are reviewed before any transfer is made.</p>
+
             </div>
             <button id="toggle-withdraw-form" class="btn btn-primary" type="button">Request withdrawal</button>
           </div>
 
           <div id="withdraw-form-panel" hidden>
             <form id="withdraw-form" class="form-card form-grid">
-              <div class="notice">Only USDT withdrawals are supported. Submitting a request may reserve the amount from your available balance. No blockchain transfer occurs when you submit.</div>
+              <div class="notice">USDT only. Requests reserve the amount; transfers are completed separately.</div>
 
               <div class="field">
                 <label>Amount (USDT)</label>
@@ -2435,12 +2454,12 @@ async function memberPage() {
                 </div>
               </article>`;
             }).join('')
-          : '<div class="notice">No active contracts yet. A request must be approved by an administrator before a contract is created.</div>';
+          : '<div class="notice">No active contracts.</div>';
 
         main.innerHTML = `<section>
           <p class="eyebrow">PLANS & REQUESTS</p>
           <h2>Explore investment plans</h2>
-          <p class="muted">Submit a request for review. Submitting a request does not activate a contract or guarantee returns.</p>
+
           <div class="investment-plan-grid">${planCards}</div>
         </section>
 
@@ -2518,7 +2537,7 @@ async function memberPage() {
           <section class="card referral-score-card">
             <p class="eyebrow">YOUR REFERRAL SCORE</p>
             <strong>${Number(referral.referral_score || 0).toLocaleString()}</strong>
-            <p>Members who signed up using your referral code.</p>
+
           </section>
           <section class="card referral-share-card">
             <p class="eyebrow">YOUR REFERRAL CODE</p>
@@ -2602,7 +2621,7 @@ async function memberPage() {
         main.innerHTML = `<section class="card">
           <p class="eyebrow">ACCOUNT SETTINGS</p>
           <h2>Your profile</h2>
-          <p class="muted">Keep your account details current.</p>
+
 
           <form id="profile-form" class="form-card form-grid">
             <div class="field">
@@ -2644,7 +2663,7 @@ async function memberPage() {
             <div class="field">
               <label>Choose an image</label>
               <input type="file" name="file" accept="image/jpeg,image/png,image/webp" required>
-              <small class="muted">JPG, PNG, or WEBP. Maximum size: 10 MB.</small>
+              <small class="muted">JPG, PNG or WEBP · Max 10 MB</small>
             </div>
 
             <button class="btn btn-outline" type="submit">Upload photo</button>
@@ -2875,7 +2894,7 @@ async function memberPage() {
         </a>
       </div>
       <div class="notice" style="margin-top:20px">
-        Manually verify incoming bank receipts and blockchain transactions before approving deposits. Withdrawal approval is not a transfer; record a transfer reference only after funds are sent.
+        Verify incoming payments before approval. Mark withdrawals completed only after transfer.
       </div>`;
     }
 
@@ -2883,7 +2902,7 @@ async function memberPage() {
       const d = await api('/api/admin/users');
 
       main.innerHTML = `<div class="notice">
-        Set a member's available USDT balance. Each change records the previous and new balance, signed adjustment, admin, and reason in the transaction ledger and audit log. Withdrawal decisions remain forward-only: pending requests can be approved or rejected; approved requests can be marked completed after transfer.
+
       </div>
       <div class="table-wrap" style="margin-top:20px">
         <table>
@@ -3007,7 +3026,7 @@ async function memberPage() {
               <div>
                 <p class="eyebrow">IDENTITY VERIFICATION</p>
                 <h2>KYC applications</h2>
-                <p class="muted">Review submitted identity and proof-of-address documents.</p>
+
               </div>
               <span class="chip">${items.length} records</span>
             </div>
@@ -3449,7 +3468,7 @@ async function memberPage() {
                     <button class="btn btn-outline" type="submit">Record performance</button>
                     <div class="form-message" aria-live="polite"></div>
                   </form>`
-                : '<p class="muted">Performance entry is available only for active contracts.</p>'}
+                : '<p class="muted"></p>'}
             </article>`).join('')
           : '<div class="empty-state">Approved contracts will appear here.</div>'}
       </section>`;
@@ -3821,17 +3840,48 @@ function bindPublic() {
   f?.addEventListener('submit', e => {
     e.preventDefault();
     $('#form-message').innerHTML = notice(
-      'Form fields validated. No message has been sent; configure a support endpoint before launch.',
+      'Your enquiry details have been validated. Message delivery is not yet enabled.',
       'success'
     );
   });
 }
 
+/* NORTHSTAR_TAWKTO_CHAT_V1 */
+function initTawkChat() {
+  // Keep customer-facing chat out of the admin dashboard.
+  if (page.startsWith('admin-') || location.pathname.includes('/admin/')) {
+    return;
+  }
+
+  // Prevent duplicate widget injection.
+  if (document.getElementById('northstar-tawkto-script')) {
+    return;
+  }
+
+  window.Tawk_API = window.Tawk_API || {};
+  window.Tawk_LoadStart = window.Tawk_LoadStart || new Date();
+
+  const script = document.createElement('script');
+  script.id = 'northstar-tawkto-script';
+  script.async = true;
+  script.src = 'https://embed.tawk.to/6af3b0285fbe7b3c4b749183/1k73ug8mo';
+  script.charset = 'UTF-8';
+  script.setAttribute('crossorigin', '*');
+
+  const firstScript = document.getElementsByTagName('script')[0];
+
+  if (firstScript?.parentNode) {
+    firstScript.parentNode.insertBefore(script, firstScript);
+  } else {
+    document.head.appendChild(script);
+  }
+}
 async function init() {
   initTheme();
   loadOptionalFonts();
   bindPageTransitions();
   nav();
+  initTawkChat();
   footer();
 
   if (page === 'login') {

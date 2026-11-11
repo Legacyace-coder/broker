@@ -3914,3 +3914,91 @@ h1, h2, h3, h4 {
         background: transparent;
     }
 }
+/* NORTHSTAR_CELESTIAL_THEME_TOGGLE_V1 */
+.theme-toggle {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    color .25s ease,
+    border-color .25s ease,
+    background .25s ease,
+    transform .3s ease;
+}
+
+.theme-toggle:hover {
+  color: var(--gold);
+  border-color: var(--gold);
+  background: rgba(201,164,92,.08);
+  transform: rotate(-12deg);
+}
+
+.theme-toggle:active {
+  transform: scale(.92) rotate(0);
+}
+
+.theme-toggle-icon {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  font-size: 0;
+  line-height: 1;
+}
+
+.theme-toggle-icon svg {
+  display: block;
+  width: 22px;
+  height: 22px;
+  overflow: visible;
+  transition: transform .35s ease;
+}
+
+.theme-toggle:hover .theme-toggle-icon svg {
+  transform: rotate(12deg) scale(1.08);
+}
+
+.theme-toggle-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 4px;
+}
+
+@media (max-width: 850px) {
+  .theme-toggle {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    align-self: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-toggle,
+  .theme-toggle-icon svg {
+    transition: none;
+  }
+}
+/* END NORTHSTAR_CELESTIAL_THEME_TOGGLE_V1 */
