@@ -1,0 +1,44 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Review member identity verification applications">
+  <meta name="theme-color" content="#080a0e">
+  <title>KYC Reviews | Admin</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-page="admin-kyc">
+  <header class="site-header">
+    <div class="container nav-container">
+      <a class="logo" href="../index.html">NORTHSTAR<span> CAPITAL</span></a>
+      <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">☰</button>
+      <nav class="main-nav" id="main-nav"></nav>
+    </div>
+  </header>
+
+  <main id="app" class="reveal">
+    <div class="container section">
+      <p class="loading">Loading page…</p>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-content">
+      <a class="logo" href="../index.html">NORTHSTAR<span> CAPITAL</span></a>
+      <p>Research. Responsibility. Perspective.</p>
+      <div class="footer-links">
+        <a href="../pages/about.html">About</a>
+        <a href="../pages/corporate-responsibility.html">Responsibility</a>
+        <a href="../pages/plans.html">Plans</a>
+        <a href="../pages/contact.html">Contact</a>
+        <a href="../pages/terms.html">Terms</a>
+      </div>
+      <p class="footer-bottom">© <span data-year></span> Northstar Capital. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="../assets/js/config.js"></script>
+  <script type="module" src="../assets/js/app.js"></script>
+</body>
+</html>

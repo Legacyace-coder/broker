@@ -85,12 +85,26 @@ function resolveTheme(preference) {
     : 'dark';
 }
 
+/* NORTHSTAR_THEME_BRAND_LOGOS_V1 */
+function updateBrandLogos(theme) {
+  document.querySelectorAll('img[data-brand-logo]').forEach(img => {
+    const source = theme === 'light'
+      ? img.dataset.logoLight
+      : img.dataset.logoDark;
+
+    if (source && img.getAttribute('src') !== source) {
+      img.setAttribute('src', source);
+    }
+  });
+}
 function applyTheme(preference = getThemePreference()) {
   const selected = resolveTheme(preference);
 
   document.documentElement.dataset.theme = selected;
   document.documentElement.dataset.themePreference = preference;
   document.documentElement.style.colorScheme = selected;
+
+  updateBrandLogos(selected);
 
   const toggle = document.querySelector('[data-theme-toggle]');
 

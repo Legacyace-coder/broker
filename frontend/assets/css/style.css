@@ -4202,3 +4202,36 @@ iframe#tawkchat-minified-iframe {
 }
 
 /* END NORTHSTAR_GOLD_MINING_SECTOR_V1 */
+
+
+/* NORTHSTAR_BRAND_ASSETS_V1 */
+.logo {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  line-height: 0;
+}
+
+.logo img {
+  display: block;
+  width: auto;
+  height: 42px;
+  max-width: min(208px, 42vw);
+  object-fit: contain;
+}
+
+.site-footer .logo img {
+  height: 36px;
+  max-width: min(190px, 42vw);
+}
+
+@media (max-width: 580px) {
+  .logo img {
+    height: 36px;
+    max-width: 42vw;
+  }
+
+  .site-footer .logo img {
+    height: 32px;
+  }
+}
