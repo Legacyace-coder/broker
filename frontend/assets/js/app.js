@@ -693,8 +693,13 @@ function home() {
           <span class="home-sector-copy"><span class="eyebrow">Property / ownership / liquidity</span><strong>Real estate</strong><span>Property fundamentals, ownership structures and due diligence.</span></span>
           <span class="home-sector-arrow" aria-hidden="true">↗</span>
         </a>
-        <a class="home-sector-row" href="pages/agriculture.html">
+        <a class="home-sector-row" href="pages/gold-mining.html">
           <span class="home-sector-number">03</span>
+          <img src="assets/images/gold mining cta.jpg" alt="Gold mining and mineral exploration" loading="lazy">
+          <span class="home-sector-copy"><span class="eyebrow">Exploration / geology / responsible mining</span><strong>Gold mining</strong><span>Mineral exploration, extraction, processing and responsible operations.</span></span>
+          <span class="home-sector-arrow" aria-hidden="true">↗</span>
+        </a>        <a class="home-sector-row" href="pages/agriculture.html">
+          <span class="home-sector-number">04</span>
           <img src="assets/images/agriculture.jpg" alt="Agriculture and production" loading="lazy">
           <span class="home-sector-copy"><span class="eyebrow">Production / supply chains / land</span><strong>Agriculture</strong><span>Production systems, processing capacity and routes to market.</span></span>
           <span class="home-sector-arrow" aria-hidden="true">↗</span>

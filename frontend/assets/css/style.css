@@ -2903,7 +2903,15 @@ h1, h2, h3, h4 {
   }
 
   .home-method-layout {
+    grid-template-columns: minmax(0, 1fr);
     gap: 35px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .home-method-image,
+  .home-method-copy {
+    min-width: 0;
   }
 
   .home-method-image::after {
