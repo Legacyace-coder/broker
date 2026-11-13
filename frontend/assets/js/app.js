@@ -2122,7 +2122,7 @@ async function memberPage() {
         'https://s3.tradingview.com/external-embedding/embed-widget-forex-cross-rates.js',
         {
           width: '100%',
-          height: 400,
+          height: 280,
           currencies: ['EUR', 'USD', 'JPY', 'GBP', 'CHF', 'AUD', 'CAD', 'NGN'],
           colorTheme: 'dark',
           locale: 'en'
