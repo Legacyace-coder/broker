@@ -3117,7 +3117,7 @@ async function memberPage() {
       const d = await api('/api/admin/users');
 
       main.innerHTML = `<div class="notice">
-
+        Add or subtract funds from a member's existing USDT balance. Every adjustment is recorded in the transaction ledger.
       </div>
       <div class="table-wrap" style="margin-top:20px">
         <table>
@@ -3126,26 +3126,50 @@ async function memberPage() {
               <th>User</th>
               <th>Role</th>
               <th>Current balance</th>
-              <th>Set balance (USDT)</th>
-              <th>Reason (required)</th>
-              <th>Action</th>
+              <th>Balance adjustment (USDT)</th>
             </tr>
           </thead>
           <tbody>
             ${d.items.map(user => {
-              const wallet = Array.isArray(user.wallets) ? user.wallets[0] : user.wallets;
+              const wallet = Array.isArray(user.wallets)
+                ? user.wallets.find(item => String(item.asset || '').toUpperCase() === 'USDT')
+                : (String(user.wallets?.asset || '').toUpperCase() === 'USDT' ? user.wallets : null);
               const balance = wallet?.balance ?? 0;
-              const asset = wallet?.asset || 'USDT';
+              const asset = 'USDT';
 
               return `<tr>
                 <td>${esc(user.email || user.id)}<br><small>${esc(user.full_name || '')}</small></td>
                 <td>${esc(user.role)}</td>
-                <td><span data-current-balance="${esc(user.id)}">${money(balance, asset)}</span></td>
-                <td colspan="3">
-                  <form class="actions balance-edit-form" data-user-id="${esc(user.id)}">
-                    <input aria-label="New balance for ${esc(user.email || user.id)}" name="balance" type="number" min="0" max="999999999999.99999999" step="0.00000001" value="${esc(balance)}" required>
-                    <input aria-label="Reason for balance change" name="reason" type="text" maxlength="500" minlength="3" placeholder="Reason for adjustment" required>
-                    <button class="btn btn-outline small-btn" type="submit">Set balance</button>
+                <td><strong data-current-balance="${esc(user.id)}">${money(balance, asset)}</strong></td>
+                <td>
+                  <form class="balance-adjust-form" data-user-id="${esc(user.id)}">
+                    <div class="actions" style="align-items:center;gap:8px">
+                      <input
+                        aria-label="Adjustment amount for ${esc(user.email || user.id)}"
+                        name="amount"
+                        type="number"
+                        min="0.00000001"
+                        max="999999999999.99999999"
+                        step="0.00000001"
+                        placeholder="Amount"
+                        required
+                        style="max-width:150px"
+                      >
+                      <input
+                        aria-label="Reason for balance adjustment"
+                        name="reason"
+                        type="text"
+                        maxlength="500"
+                        minlength="3"
+                        placeholder="Reason for adjustment"
+                        required
+                        style="min-width:180px"
+                      >
+                    </div>
+                    <div class="actions" style="margin-top:8px;gap:8px">
+                      <button class="btn btn-outline small-btn balance-adjust-btn" type="button" data-operation="add">Add to Balance</button>
+                      <button class="btn btn-outline small-btn balance-adjust-btn" type="button" data-operation="subtract">Subtract from Balance</button>
+                    </div>
                     <span id="balance-message-${esc(user.id)}" aria-live="polite"></span>
                   </form>
                 </td>
@@ -3155,43 +3179,68 @@ async function memberPage() {
         </table>
       </div>`;
 
-      main.querySelectorAll('.balance-edit-form').forEach(form => {
-        form.addEventListener('submit', async event => {
-          event.preventDefault();
+      main.querySelectorAll('.balance-adjust-form').forEach(form => {
+        const buttons = form.querySelectorAll('.balance-adjust-btn');
 
-          const fields = new FormData(form);
-          const userId = form.dataset.userId;
-          const message = $(`#balance-message-${CSS.escape(userId)}`);
-          const button = $('button[type="submit"]', form);
+        buttons.forEach(button => {
+          button.addEventListener('click', async () => {
+            if (!form.reportValidity()) return;
 
-          button.disabled = true;
+            const fields = new FormData(form);
+            const userId = form.dataset.userId;
+            const operation = button.dataset.operation;
+            const message = $(`#balance-message-${CSS.escape(userId)}`);
+            const amountInput = $('input[name="amount"]', form);
 
-          try {
-            const result = await api(`/api/admin/users/${encodeURIComponent(userId)}/balance`, {
-              method: 'PUT',
-              body: JSON.stringify({
-                balance: fields.get('balance'),
-                reason: fields.get('reason')
-              })
-            });
-
-            const item = result.item;
-            const current = $(`[data-current-balance="${CSS.escape(userId)}"]`);
-
-            if (current && item) {
-              current.textContent = money(item.balance, item.asset || 'USDT');
+            if (!amountInput.value || Number(amountInput.value) <= 0) {
+              amountInput.focus();
+              return;
             }
 
-            message.innerHTML = notice(result.message, 'success');
-          } catch (error) {
-            message.innerHTML = notice(error.message || 'Balance could not be updated.', 'error');
-          } finally {
-            button.disabled = false;
-          }
+            buttons.forEach(item => {
+              item.disabled = true;
+            });
+
+            const originalLabel = button.textContent;
+            button.textContent = operation === 'add' ? 'Adding...' : 'Subtracting...';
+
+            try {
+              const result = await api(
+                `/api/admin/users/${encodeURIComponent(userId)}/balance/adjust`,
+                {
+                  method: 'POST',
+                  body: JSON.stringify({
+                    amount: fields.get('amount'),
+                    operation,
+                    reason: fields.get('reason')
+                  })
+                }
+              );
+
+              const item = result.item;
+              const current = $(`[data-current-balance="${CSS.escape(userId)}"]`);
+
+              if (current && item) {
+                current.textContent = money(item.balance, item.asset || 'USDT');
+              }
+
+              amountInput.value = '';
+              message.innerHTML = notice(result.message, 'success');
+            } catch (error) {
+              message.innerHTML = notice(
+                error.message || 'Balance adjustment could not be completed.',
+                'error'
+              );
+            } finally {
+              button.textContent = originalLabel;
+              buttons.forEach(item => {
+                item.disabled = false;
+              });
+            }
+          });
         });
       });
     }
-
     else if (page === 'admin-kyc') {
       let currentFilter = 'pending_review';
 

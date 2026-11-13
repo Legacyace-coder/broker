@@ -17,6 +17,7 @@ from .config import settings
 from .security import admin_db, current_user, member_user, admin_user
 from .schemas import (
     BankInstructionsUpdate,
+    BalanceAdjustRequest,
     BalanceSetRequest,
     CryptoInstructionsUpdate,
     DepositRequest,
@@ -749,6 +750,46 @@ def set_user_balance(
         ) from exc
 
 
+
+@app.post("/api/admin/users/{user_id}/balance/adjust")
+def adjust_user_balance(
+    user_id: str,
+    payload: BalanceAdjustRequest,
+    admin: dict = Depends(admin_user),
+):
+    try:
+        result = admin_db.rpc(
+            "admin_adjust_user_balance",
+            {
+                "p_user_id": user_id,
+                "p_amount": str(payload.amount),
+                "p_operation": payload.operation,
+                "p_admin_id": admin["id"],
+                "p_reason": payload.reason,
+            },
+        ).execute()
+
+        message = (
+            "User balance increased successfully and recorded in the ledger"
+            if payload.operation == "add"
+            else "User balance decreased successfully and recorded in the ledger"
+        )
+
+        return {
+            "message": message,
+            "item": result.data,
+        }
+
+    except APIError as exc:
+        logger.exception(
+            "Admin balance adjustment failed for user %s",
+            user_id,
+        )
+
+        raise HTTPException(
+            400,
+            "Balance adjustment failed; verify the user, USDT wallet, and available balance",
+        ) from exc
 # ============================================================
 # ADMIN DEPOSITS
 # ============================================================

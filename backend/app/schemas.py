@@ -56,6 +56,12 @@ class BalanceSetRequest(BaseModel):
     balance: Annotated[Decimal, Field(ge=0, le=Decimal("999999999999.99999999"), max_digits=20, decimal_places=8)]
     reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=500)]
 
+
+class BalanceAdjustRequest(BaseModel):
+    amount: Annotated[Decimal, Field(gt=0, le=Decimal("999999999999.99999999"), max_digits=20, decimal_places=8)]
+    operation: Literal["add", "subtract"]
+    reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=500)]
+
 class CryptoInstructionsUpdate(BaseModel):
     asset: Literal["USDT", "BTC", "ETH", "USDC"] = "USDT"
     enabled: bool
