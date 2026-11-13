@@ -1512,7 +1512,7 @@ async function handleAuth() {
 
         showRegistrationResult(
           true,
-          'Your account has been created. If email confirmation is enabled, check your inbox to verify your address before signing in.'
+          'Account created. Check email to confirm email before logging in.'
         );
         return;
       }
