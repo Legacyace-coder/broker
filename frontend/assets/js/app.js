@@ -51,6 +51,8 @@ const pageLinks = {
   responsibility: 'pages/corporate-responsibility.html',
   'digital-assets': 'pages/digital-assets.html',
   'real-estate': 'pages/real-estate.html',
+  'gold-mining': 'pages/gold-mining.html',
+  'oil-and-gas': 'pages/oil-and-gas.html',
   agriculture: 'pages/agriculture.html',
   plans: 'pages/plans.html',
   faq: 'pages/faq.html',
@@ -233,8 +235,12 @@ function nav() {
               <span class="nav-dropdown-number">03</span>
               <span>Gold Mining</span>
             </a>
-            <a href="${root}pages/agriculture.html">
+            <a href="${root}pages/oil-and-gas.html">
               <span class="nav-dropdown-number">04</span>
+              <span>Oil &amp; Gas Investment</span>
+            </a>
+            <a href="${root}pages/agriculture.html">
+              <span class="nav-dropdown-number">05</span>
               <span>Agriculture</span>
             </a>
           </div>
@@ -677,7 +683,7 @@ function home() {
   <section class="home-sectors section">
     <div class="container">
       <div class="home-section-heading">
-        <div><p class="eyebrow">Research areas</p><h2>Four markets.<br>One measured lens.</h2></div>
+        <div><p class="eyebrow">Research areas</p><h2>Five markets.<br>One measured lens.</h2></div>
         <p>We look beyond the headline to understand structures, constraints and the forces that shape long-term outcomes.</p>
       </div>
       <div class="home-sector-list">
@@ -698,8 +704,14 @@ function home() {
           <img src="assets/images/gold mining cta.jpg" alt="Gold mining and mineral exploration" loading="lazy">
           <span class="home-sector-copy"><span class="eyebrow">Exploration / geology / responsible mining</span><strong>Gold mining</strong><span>Mineral exploration, extraction, processing and responsible operations.</span></span>
           <span class="home-sector-arrow" aria-hidden="true">↗</span>
-        </a>        <a class="home-sector-row" href="pages/agriculture.html">
+        </a>        <a class="home-sector-row" href="pages/oil-and-gas.html">
           <span class="home-sector-number">04</span>
+          <img src="assets/images/oil and gas cta image.jpg" alt="Oil and gas energy infrastructure" loading="lazy">
+          <span class="home-sector-copy"><span class="eyebrow">Energy / exploration / infrastructure</span><strong>Oil &amp; gas investment</strong><span>Exploration, production, processing and energy distribution.</span></span>
+          <span class="home-sector-arrow" aria-hidden="true">↗</span>
+        </a>
+        <a class="home-sector-row" href="pages/agriculture.html">
+          <span class="home-sector-number">05</span>
           <img src="assets/images/agriculture.jpg" alt="Agriculture and production" loading="lazy">
           <span class="home-sector-copy"><span class="eyebrow">Production / supply chains / land</span><strong>Agriculture</strong><span>Production systems, processing capacity and routes to market.</span></span>
           <span class="home-sector-arrow" aria-hidden="true">↗</span>
@@ -1058,8 +1070,23 @@ const publicContent = {
 
 
 
-  agriculture: () => sector(
+  'oil-and-gas': () => sector(
     'OUR SECTORS / 04',
+    'Understanding the<br><span>oil and gas industry.</span>',
+    'Explore the energy value chain, from exploration and production to processing, transportation and the infrastructure supporting energy markets.',
+    [
+      ['Exploration and production', 'Geological assessment, resource evaluation, drilling operations and the technical and commercial considerations involved in bringing resources into production.'],
+      ['Refining and processing', 'Processing facilities, product quality, operational efficiency and the infrastructure required to transform raw resources into usable energy products.'],
+      ['Transportation and storage', 'Pipelines, terminals, storage facilities, logistics networks and the infrastructure connecting production to end markets.'],
+      ['Economics and environmental responsibility', 'Capital requirements, commodity-price exposure, regulatory obligations, operational safety, emissions and environmental management.']
+    ],
+    'oil and gas image.jpg',
+    'Oil and gas production and energy infrastructure.',
+    'oil-and-gas'
+  ),
+
+  agriculture: () => sector(
+    'OUR SECTORS / 05',
     'Supporting the<br><span>future of food.</span>',
     'Explore agricultural production, processing, storage and market access.',
     [

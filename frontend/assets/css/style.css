@@ -4423,3 +4423,39 @@ iframe#tawkchat-minified-iframe {
     padding: 14px;
   }
 }
+
+/* NORTHSTAR_OIL_AND_GAS_SECTOR_V1 */
+
+.sector-page-hero--oil-and-gas {
+  --page-hero-image:
+    url("../images/oil%20and%20gas%20investment%20hero%20background.jpg");
+  background-image:
+    linear-gradient(90deg, rgba(17, 23, 25, .96), rgba(29, 42, 43, .72), rgba(35, 49, 48, .24)),
+    var(--page-hero-image);
+}
+
+.sector-page-hero--oil-and-gas::before {
+  background-image:
+    linear-gradient(90deg, rgba(17, 23, 25, .96) 0%, rgba(29, 42, 43, .72) 52%, rgba(35, 49, 48, .24) 100%),
+    var(--page-hero-image);
+}
+
+.sector-page-hero--oil-and-gas,
+.sector-page-hero--oil-and-gas h1,
+.sector-page-hero--oil-and-gas .eyebrow {
+  color: #f7f5ed;
+}
+
+.sector-page-hero--oil-and-gas p:not(.eyebrow) {
+  color: rgba(247, 245, 237, .84);
+}
+
+@media (max-width: 580px) {
+  .sector-page-hero--oil-and-gas {
+    background-image:
+      linear-gradient(90deg, rgba(17, 23, 25, .96), rgba(29, 42, 43, .84)),
+      var(--page-hero-image);
+  }
+}
+
+/* END NORTHSTAR_OIL_AND_GAS_SECTOR_V1 */
