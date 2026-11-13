@@ -1310,6 +1310,13 @@ function authForm(title, sub, kind) {
             : `<a href="login.html">Back to sign in</a>`}
       </p>
     </form>
+    <div class="auth-loading-overlay" id="auth-loading-overlay" hidden role="status" aria-live="polite">
+      <div class="auth-loading-panel">
+        <span class="auth-loading-spinner" aria-hidden="true"></span>
+        <strong data-auth-loading-title>Working…</strong>
+        <span class="auth-loading-detail" data-auth-loading-detail>Please wait while we process your request.</span>
+      </div>
+    </div>
     ${registration ? `<dialog class="auth-dialog" id="auth-result-dialog" aria-labelledby="auth-dialog-title">
       <div class="auth-dialog-content">
         <span class="auth-dialog-icon" data-auth-dialog-icon aria-hidden="true"></span>
@@ -1400,6 +1407,22 @@ async function handleAuth() {
   let captchaToken = '';
   let widgetId;
 
+  const loadingOverlay = $('#auth-loading-overlay');
+  const loadingTitle = $('[data-auth-loading-title]', loadingOverlay);
+  const loadingDetail = $('[data-auth-loading-detail]', loadingOverlay);
+
+  function showAuthLoading(title, detail) {
+    if (!loadingOverlay) return;
+    loadingTitle.textContent = title;
+    loadingDetail.textContent = detail;
+    loadingOverlay.hidden = false;
+    submitButton.disabled = true;
+  }
+
+  function hideAuthLoading() {
+    if (loadingOverlay) loadingOverlay.hidden = true;
+  }
+
   const dialog = $('#auth-result-dialog');
 
   if (dialog) {
@@ -1447,6 +1470,14 @@ async function handleAuth() {
     const data = new FormData(form);
 
     try {
+      if (kind === 'login') {
+        showAuthLoading('Logging you in…', 'Please wait while we securely sign you in.');
+      } else if (kind === 'register') {
+        showAuthLoading('Creating your account…', 'Please wait while we create your account.');
+      } else {
+        showAuthLoading('Sending password reset email…', 'Please wait while we process your password reset request.');
+      }
+
       const client = await getSupabase();
       let res;
 
@@ -1510,6 +1541,7 @@ async function handleAuth() {
 
         if (res.error) throw res.error;
 
+        hideAuthLoading();
         showRegistrationResult(
           true,
           'Account created. Check email to confirm email before logging in.'
@@ -1524,7 +1556,10 @@ async function handleAuth() {
       if (res.error) throw res.error;
 
       out.innerHTML = notice('If the account exists, a password reset email has been requested.', 'success');
+      hideAuthLoading();
     } catch (err) {
+      hideAuthLoading();
+
       if (kind === 'register') {
         showRegistrationResult(false, err.message || 'We could not create your account. Please try again.');
       } else {
@@ -1540,6 +1575,8 @@ async function handleAuth() {
     } finally {
       if (kind === 'register' && !dialog?.open && widgetId !== undefined) {
         submitButton.disabled = !captchaToken;
+      } else if (kind !== 'register' && loadingOverlay?.hidden) {
+        submitButton.disabled = false;
       }
     }
   });
@@ -2619,7 +2656,7 @@ async function memberPage() {
           <h2>Plan requests</h2>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Plan</th><th>Amount</th><th>Status</th><th>Your note</th><th>Submitted</th><th>Admin note</th></tr></thead>
+              <thead><tr><th>Plan</th><th>Amount</th><th>Status</th><th>Currency</th><th>Submitted</th><th>Admin note</th></tr></thead>
               <tbody>${requestRows}</tbody>
             </table>
           </div>
@@ -3570,13 +3607,13 @@ async function memberPage() {
         ${requests.length
           ? `<div class="table-wrap">
               <table>
-                <thead><tr><th>Member</th><th>Plan</th><th>Requested</th><th>Submitted</th><th>Member note</th><th>Review</th></tr></thead>
+                <thead><tr><th>Member</th><th>Plan</th><th>Requested</th><th>Submitted</th><th>Currency</th><th>Review</th></tr></thead>
                 <tbody>${requests.map(request => `<tr>
                   <td>${esc(request.profiles?.full_name || request.profiles?.display_name || request.profiles?.email || request.user_id)}</td>
                   <td>${esc(request.plans?.name || 'Investment plan')}</td>
                   <td>${money(request.requested_amount, request.asset || 'USDT')}</td>
                   <td>${esc(date(request.created_at))}</td>
-                  <td>${esc(request.member_note || '—')}</td>
+                  <td>${esc(request.asset || 'USDT')}</td>
                   <td><div class="actions">
                     <button class="btn btn-primary small-btn" type="button" data-investment-review="approved" data-id="${esc(request.id)}">Approve</button>
                     <button class="btn btn-outline small-btn" type="button" data-investment-review="rejected" data-id="${esc(request.id)}">Reject</button>
