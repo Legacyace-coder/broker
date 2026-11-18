@@ -1156,7 +1156,7 @@ const publicContent = {
         <p class="eyebrow">GET IN TOUCH</p>
         <h2>We welcome your enquiries.</h2>
         <p>Whether your enquiry concerns the company, its areas of interest or general information, you can send your message here.</p>
-        <p class="muted">Additional contact details will be published here when available.</p>
+        <p class="muted"></p>
       </div>
       <form class="form-card form-grid" id="contact-form">
         <div class="field">
