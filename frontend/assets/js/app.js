@@ -1155,7 +1155,7 @@ const publicContent = {
       <div>
         <p class="eyebrow">GET IN TOUCH</p>
         <h2>We welcome your enquiries.</h2>
-        <p>Whether your enquiry concerns the company, its areas of interest or general information, you can prepare your message here.</p>
+        <p>Whether your enquiry concerns the company, its areas of interest or general information, you can send your message here.</p>
         <p class="muted">Additional contact details will be published here when available.</p>
       </div>
       <form class="form-card form-grid" id="contact-form">
@@ -1175,7 +1175,8 @@ const publicContent = {
           <label for="contact-message">Message</label>
           <textarea id="contact-message" name="message" required maxlength="4000"></textarea>
         </div>
-        <button class="btn btn-primary" type="submit">Prepare enquiry</button>
+        <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-10000px;width:1px;height:1px;opacity:0;">
+        <button class="btn btn-primary" type="submit">Send enquiry</button>
         <div id="form-message" aria-live="polite"></div>
       </form>
     </div>
@@ -4101,12 +4102,76 @@ function bindPublic() {
 
   const f = $('#contact-form');
 
-  f?.addEventListener('submit', e => {
+  f?.addEventListener('submit', async e => {
     e.preventDefault();
-    $('#form-message').innerHTML = notice(
-      'Your enquiry details have been validated. Message delivery is not yet enabled.',
-      'success'
-    );
+
+    if (!f.reportValidity()) return;
+
+    const formMessage = $('#form-message');
+    const submitButton = f.querySelector('button[type="submit"]');
+    const originalButtonText = submitButton?.textContent || 'Send enquiry';
+    const formData = new FormData(f);
+
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.textContent = 'Sending...';
+    }
+
+    if (formMessage) {
+      formMessage.innerHTML = notice('Sending your enquiry...', '');
+    }
+
+    try {
+      const response = await fetch(`${API}/api/contact`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: String(formData.get('name') || '').trim(),
+          email: String(formData.get('email') || '').trim(),
+          subject: String(formData.get('subject') || '').trim(),
+          message: String(formData.get('message') || '').trim(),
+          website: String(formData.get('website') || '').trim()
+        })
+      });
+
+      let result = {};
+
+      try {
+        result = await response.json();
+      } catch {}
+
+      if (!response.ok) {
+        throw new Error(
+          displayText(
+            result.detail ?? result.message,
+            'We could not send your enquiry. Please try again.'
+          )
+        );
+      }
+
+      f.reset();
+
+      if (formMessage) {
+        formMessage.innerHTML = notice(
+          'Thank you. Your enquiry has been sent successfully.',
+          'success'
+        );
+      }
+    } catch (error) {
+      if (formMessage) {
+        formMessage.innerHTML = notice(
+          error.message || 'We could not send your enquiry. Please try again.',
+          ''
+        );
+      }
+    } finally {
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.textContent = originalButtonText;
+      }
+    }
   });
 }
 

@@ -2,12 +2,14 @@
 import json
 import time
 import logging
+import re
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 from datetime import datetime, timezone
 from decimal import Decimal
 
 from fastapi import FastAPI, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
 from postgrest.exceptions import APIError
 from supabase import Client
@@ -62,6 +64,107 @@ def health():
     return {
         "status": "ok",
         "service": "northstar-capital-api",
+    }
+
+
+
+class ContactEnquiry(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    email: str = Field(min_length=3, max_length=254)
+    subject: str = Field(min_length=1, max_length=160)
+    message: str = Field(min_length=1, max_length=4000)
+    website: str = Field(default="", max_length=200)
+
+
+@app.post("/api/contact")
+def send_contact_enquiry(payload: ContactEnquiry):
+    """Send a public website enquiry through Resend."""
+
+    # Honeypot: silently accept submissions from basic automated bots.
+    if payload.website.strip():
+        return {"ok": True}
+
+    name = " ".join(payload.name.split())
+    email = payload.email.strip()
+    subject = " ".join(payload.subject.split())
+    message = payload.message.strip()
+
+    if not name or not subject or not message:
+        raise HTTPException(
+            status_code=422,
+            detail="Please complete all required fields.",
+        )
+
+    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        raise HTTPException(
+            status_code=422,
+            detail="Please provide a valid email address.",
+        )
+
+    if not settings.resend_api_key.strip() or not settings.contact_from_email.strip():
+        raise HTTPException(
+            status_code=503,
+            detail="Contact email delivery is not configured yet.",
+        )
+
+    email_text = (
+        f"New enquiry received through the Northstar Capital website.\n\n"
+        f"Full name: {name}\n"
+        f"Email address: {email}\n"
+        f"Subject: {subject}\n\n"
+        f"Message:\n{message}\n"
+    )
+
+    resend_payload = {
+        "from": settings.contact_from_email.strip(),
+        "to": [settings.contact_to_email.strip()],
+        "reply_to": email,
+        "subject": f"Northstar Capital website enquiry: {subject}",
+        "text": email_text,
+    }
+
+    resend_request = Request(
+        "https://api.resend.com/emails",
+        data=json.dumps(resend_payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {settings.resend_api_key.strip()}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+
+    try:
+        with urlopen(resend_request, timeout=15) as response:
+            if response.status not in (200, 201, 202):
+                raise HTTPException(
+                    status_code=502,
+                    detail="We couldn't send your enquiry. Please try again.",
+                )
+
+    except HTTPException:
+        raise
+    except HTTPError as exc:
+        logger.warning(
+            "Resend rejected a contact enquiry with HTTP status %s",
+            exc.code,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="We couldn't send your enquiry. Please try again later.",
+        )
+    except (URLError, TimeoutError) as exc:
+        logger.warning(
+            "Resend connection failed: %s",
+            type(exc).__name__,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="Email delivery is temporarily unavailable. Please try again later.",
+        )
+
+    return {
+        "ok": True,
+        "message": "Your enquiry has been sent successfully.",
     }
 
 

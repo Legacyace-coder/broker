@@ -7,6 +7,9 @@ class Settings(BaseSettings):
     cors_origins: str = "http://127.0.0.1:5500,http://localhost:5500"
     app_env: str = "development"
     coingecko_api_key: str = ""
+    resend_api_key: str = ""
+    contact_from_email: str = ""
+    contact_to_email: str = "alanhunt455@gmail.com"
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=False)
 
 settings = Settings()
