@@ -23,7 +23,7 @@ async function getSupabase() {
 const isLocalFrontend = ['localhost', '127.0.0.1'].includes(location.hostname);
 const API = isLocalFrontend
   ? 'http://127.0.0.1:8000'
-  : cfg.API_BASE_URL || 'https://broker-backend-delta.vercel.app';
+  : cfg.API_BASE_URL || 'https://api.northstarcapitaldigitalassets.com';
 const page = document.body.dataset.page || 'home';
 const app = document.querySelector('#app');
 const $ = (sel, root = document) => root.querySelector(sel);
