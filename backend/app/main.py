@@ -144,10 +144,31 @@ def send_contact_enquiry(payload: ContactEnquiry):
     except HTTPException:
         raise
     except HTTPError as exc:
+        error_name = "unknown"
+        error_message = "No error details returned"
+
+        try:
+            error_body = json.loads(exc.read().decode("utf-8"))
+            if isinstance(error_body, dict):
+                error_name = str(
+                    error_body.get("name") or error_body.get("type") or "unknown"
+                )
+                error_message = str(
+                    error_body.get("message") or error_message
+                )
+        except (ValueError, UnicodeDecodeError, AttributeError):
+            pass
+
+        error_name = re.sub(r"[\r\n\t]", " ", error_name)[:100]
+        error_message = re.sub(r"[\r\n\t]", " ", error_message)[:300]
+
         logger.warning(
-            "Resend rejected a contact enquiry with HTTP status %s",
+            "Resend rejected a contact enquiry: status=%s error_name=%s error_message=%s",
             exc.code,
+            error_name,
+            error_message,
         )
+
         raise HTTPException(
             status_code=502,
             detail="We couldn't send your enquiry. Please try again later.",
