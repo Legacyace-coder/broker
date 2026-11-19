@@ -129,6 +129,8 @@ def send_contact_enquiry(payload: ContactEnquiry):
         headers={
             "Authorization": f"Bearer {settings.resend_api_key.strip()}",
             "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "NorthstarCapital/1.0",
         },
         method="POST",
     )
