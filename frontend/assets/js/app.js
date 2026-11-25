@@ -3924,7 +3924,7 @@ async function memberPage() {
             <textarea name="instructions" maxlength="1000">${esc(crypto.instructions || '')}</textarea>
           </div>
 
-          <button class="btn btn-primary">Save ${esc(crypto.asset)} instructions</button>
+          <button type="submit" class="btn btn-primary">Save ${esc(crypto.asset)} instructions</button>
           <div class="crypto-message" aria-live="polite"></div>
         </form>`).join('')}
 
