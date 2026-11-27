@@ -9,7 +9,13 @@ async function getSupabase() {
   if (!supabaseClientPromise) {
     supabaseClientPromise = import('https://esm.sh/@supabase/supabase-js@2.49.1')
       .then(({ createClient }) => {
-        supabase = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+        supabase = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true
+          }
+        });
         return supabase;
       })
       .catch(error => {
@@ -342,7 +348,7 @@ function nav() {
 
   $('[data-logout]')?.addEventListener('click', async e => {
     e.preventDefault();
-    if (supabase) await supabase.auth.signOut();
+    if (supabase) await supabase.auth.signOut({ scope: 'local' });
     location.href = '../pages/login.html';
   });
 }
@@ -447,7 +453,8 @@ function displayText(value, fallback = '') {
 async function session() {
   if (!configured) return null;
   const client = await getSupabase();
-  const { data } = await client.auth.getSession();
+  const { data, error } = await client.auth.getSession();
+  if (error) throw error;
   return data.session || null;
 }
 
@@ -461,7 +468,9 @@ function portalForRole(role) {
 
 async function redirectForVerifiedRole({ signOutUnknown = false } = {}) {
   const client = await getSupabase();
-  const { data: { session: activeSession } } = await client.auth.getSession();
+  const { data, error } = await client.auth.getSession();
+  if (error) throw error;
+  const activeSession = data.session || null;
 
   if (!activeSession?.access_token) return false;
 
@@ -473,50 +482,95 @@ async function redirectForVerifiedRole({ signOutUnknown = false } = {}) {
     return true;
   }
 
-  if (signOutUnknown) await client.auth.signOut();
+  if (signOutUnknown) await client.auth.signOut({ scope: 'local' });
   return false;
 }
 
 async function api(path, options = {}) {
-  const s = await session();
+  const client = await getSupabase();
+  let activeSession = await session();
 
-  if (!s?.access_token) {
-    throw new Error('Please sign in first.');
+  if (!activeSession?.access_token) {
+    const error = new Error('Your session has expired. Please sign in again.');
+    error.status = 401;
+    throw error;
   }
 
-  const headers = {
-    'Authorization': `Bearer ${s.access_token}`,
-    ...(options.headers || {})
+  const sendRequest = async accessToken => {
+    const headers = {
+      ...(options.headers || {}),
+      Authorization: `Bearer ${accessToken}`
+    };
+
+    if (
+      !(options.body instanceof FormData) &&
+      options.body !== undefined &&
+      !headers['Content-Type']
+    ) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    let response;
+
+    try {
+      response = await fetch(`${API}${path}`, {
+        ...options,
+        headers
+      });
+    } catch {
+      throw new Error(
+        `Cannot reach the API. Check that it is online and allows requests from ${location.origin}.`
+      );
+    }
+
+    let body = {};
+
+    try {
+      body = await response.json();
+    } catch {}
+
+    return { response, body };
   };
 
-  if (
-    !(options.body instanceof FormData) &&
-    options.body !== undefined &&
-    !headers['Content-Type']
-  ) {
-    headers['Content-Type'] = 'application/json';
+  let result = await sendRequest(activeSession.access_token);
+
+  // Refresh and retry only once when the backend rejects the access token.
+  if (result.response.status === 401) {
+    const { data, error } = await client.auth.refreshSession();
+
+    if (error || !data?.session?.access_token) {
+      if (error?.name === 'AuthRetryableFetchError') {
+        const authError = new Error(
+          'Authentication service is temporarily unavailable. Please try again.'
+        );
+        authError.status = [502, 503, 504].includes(error.status) ? error.status : 503;
+        throw authError;
+      }
+
+      await client.auth.signOut({ scope: 'local' });
+
+      const authError = new Error(
+        'Your session has expired. Please sign in again.'
+      );
+      authError.status = 401;
+      throw authError;
+    }
+
+    activeSession = data.session;
+    result = await sendRequest(activeSession.access_token);
   }
 
-  let r;
-  try {
-    r = await fetch(`${API}${path}`, { ...options, headers });
-  } catch {
-    throw new Error(`Cannot reach the API. Check that it is online and allows requests from ${location.origin}.`);
+  if (!result.response.ok) {
+    const reason = result.body.detail ?? result.body.message;
+    const requestError = new Error(
+      displayText(reason, 'Request failed')
+    );
+    requestError.status = result.response.status;
+    throw requestError;
   }
 
-  let body = {};
-  try {
-    body = await r.json();
-  } catch {}
-
-  if (!r.ok) {
-    const reason = body.detail ?? body.message;
-    throw new Error(displayText(reason, 'Request failed'));
-  }
-
-  return body;
+  return result.body;
 }
-
 function getMemberProfile() {
   if (!memberProfilePromise) {
     memberProfilePromise = api('/api/me').catch(error => {
@@ -1526,7 +1580,6 @@ async function handleAuth() {
             throw new Error('This account does not have an authorised member or administrator role. Contact support.');
           }
         } catch (routeError) {
-          await client.auth.signOut();
           throw routeError;
         }
 
@@ -1651,7 +1704,7 @@ async function protect() {
 
     if (!target) {
       const client = await getSupabase();
-      await client.auth.signOut();
+      await client.auth.signOut({ scope: 'local' });
       location.replace('../pages/login.html');
       return false;
     }
@@ -1669,9 +1722,25 @@ async function protect() {
     if (isAdmin) await api('/api/admin/overview');
     return true;
   } catch (err) {
+    if (err.status === 401) {
+      try {
+        const client = await getSupabase();
+        await client.auth.signOut({ scope: 'local' });
+      } catch (signOutError) {
+        console.warn('Local sign-out failed:', signOutError);
+      }
+
+      location.replace('../pages/login.html');
+      return false;
+    }
+
     app.innerHTML = `<section class="section">
       <div class="container">
         ${notice(err.message || 'Unable to load your account.', 'error')}
+        <p class="mt-3">
+          <a class="btn btn-outline" href="${location.href}">Retry</a>
+          <a class="btn btn-outline" href="../pages/login.html">Return to login</a>
+        </p>
       </div>
     </section>`;
     return false;
@@ -4232,13 +4301,10 @@ async function init() {
     try {
       if (await redirectForVerifiedRole({ signOutUnknown: true })) return;
     } catch (error) {
-      app.innerHTML = `<section class="section">
-        <div class="container">
-          ${notice(error.message || 'Unable to verify your account. Please try again.', 'error')}
-          <a class="btn btn-outline" href="../pages/login.html">Continue to login</a>
-        </div>
-      </section>`;
-      return;
+      console.warn(
+        'Existing session verification failed; showing login form:',
+        error
+      );
     }
   }
 
